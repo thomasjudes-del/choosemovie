@@ -1,8 +1,25 @@
-const DATA=(window.CHOOSE_DATA||[]).map(x=>({
-  title:x.t,year:x.y||null,kind:x.k||'movie',copies:x.c||1,enriched:!!x.e,
-  r:x.r||null,d:x.d||null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',
-  poster:x.p||'',director:x.dir||'',imdb:x.id||'',key:((x.t||'')+'|'+(x.y||''))
-}));
+const ENRICH=window.CHOOSE_ENRICH||{};
+const DATA=(window.CHOOSE_DATA||[]).map(x=>{
+  const key=((x.t||'')+'|'+(x.y||''));
+  const e=ENRICH[key]||{};
+  return {
+    title:x.t,
+    year:x.y||e.y||null,
+    kind:x.k||e.kind||'movie',
+    copies:x.c||1,
+    enriched:!!x.e||!!e.matched,
+    r:x.r||e.r||null,
+    d:x.d||e.d||null,
+    g:(x.g&&x.g.length)?x.g:(e.g||[]),
+    a:(x.a&&x.a.length)?x.a:(e.a||[]),
+    k:(x.w&&x.w.length)?x.w:(e.w||[]),
+    s:x.s||e.s||'',
+    poster:x.p2||e.p||x.p||'',
+    director:x.dir||e.dir||'',
+    imdb:x.id||e.id||'',
+    key
+  };
+});
 let onlyReady=false,seed=1;
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -72,7 +89,7 @@ function row(x){
     </div>
     <div class=details>
       <div class=detailgrid>
-        <div class=posterwrap>${x.poster?`<img class=poster src="${esc(x.poster)}" alt="">`:`<div class=posterplaceholder>Pas de visuel</div>`}</div>
+        <div class=posterwrap>${x.poster?`<img class=poster src="${esc(x.poster)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="posterplaceholder posterfallback" style="display:none">Pas de visuel</div>`:`<div class=posterplaceholder>Pas de visuel</div>`}</div>
         <div>
           <div class=detailtitle>${esc(x.title)} ${x.year?'('+x.year+')':''}</div>
           <p class=syn>${esc(x.s||'Pas de synopsis disponible pour ce titre.')}</p>
