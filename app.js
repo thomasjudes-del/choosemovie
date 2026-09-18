@@ -40,12 +40,12 @@ const RELEASE_WORDS = /\b(?:1080p|720p|2160p|4k|webrip|web[- .]?dl|bluray|brrip|
 const VIDEO_EXT = /\.(avi|mkv|mp4|m4v|mov|webm|divx|mpg|mpeg|ts)$/i;
 const AUX_EXT = /\.(srt|sub|idx|zip|rar|txt|nfo|jpg|jpeg|png|gif|mp3|flac|wav)$/i;
 const SERIES_PATTERNS = /\b(s\d{1,2}(?:e\d{1,2})?|season\s*\d*|saison\s*\d*|series|serie|complete season|mini[- ]?series)\b/i;
-const COLLECTION_PATTERNS = /\b(serie|trilogie|integrale|duology|collection)\b/i;
+const COLLECTION_PATTERNS = /(?:^\s*0?\s*serie\s+|\b(trilogie|integrale|duology|collection)\b)/i;
 
 function cleanCandidate(raw, entryType) {
   let name = raw.trim();
   const original = name;
-  name = name.replace(VIDEO_EXT, '').replace(/_/g, ' ').replace(/\.+/g, ' ');
+  name = name.replace(/^\s*0\s+(?=\S)/, '').replace(VIDEO_EXT, '').replace(/_/g, ' ').replace(/\.+/g, ' ');
   const years = [...name.matchAll(/\b(19\d{2}|20\d{2})\b/g)];
   const year = years.length ? Number(years[0][1]) : null;
   if (year) {
@@ -60,9 +60,8 @@ function cleanCandidate(raw, entryType) {
   name = name.replace(/[-–]+$/,'').trim();
   name = name.replace(/\b(?:eng|fr|vf|vo)\b$/i,'').trim();
   let kindHint = 'movie';
-  if (SERIES_PATTERNS.test(original) || /S\d{2}E\d{2}/i.test(original)) kindHint = 'tv';
-  if (entryType === 'DIR' && COLLECTION_PATTERNS.test(original) && !SERIES_PATTERNS.test(original)) kindHint = 'collection';
-  if (entryType === 'DIR' && /^[A-Z0-9 &'._-]{4,}$/.test(original) && !year && !SERIES_PATTERNS.test(original)) kindHint = 'collection';
+  if (entryType === 'DIR' && COLLECTION_PATTERNS.test(original)) kindHint = 'collection';
+  else if (SERIES_PATTERNS.test(original) || /S\d{2}E\d{2}/i.test(original)) kindHint = 'tv';
   return { title: name || original, year, kindHint };
 }
 
