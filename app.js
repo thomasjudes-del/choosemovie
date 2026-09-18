@@ -1,9 +1,63 @@
-const DATA=(window.CHOOSE_DATA||[]).map(x=>({
+const RAW_DATA=(window.CHOOSE_DATA||[]).map(x=>({
   title:x.t,year:x.y||null,kind:x.k||'movie',copies:x.c||1,enriched:!!x.e,
   r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',
   poster:x.p||'',director:x.dir||'',imdb:x.id||'',loc:x.loc||[],
   key:((x.t||'')+'|'+(x.y||''))
 }));
+
+function canonicalTitle(s=''){
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/\b(vf|vo|vostfr|french|english|eng|fr|extended|remastered|edition|directors? cut)\b/g,' ')
+    .replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function locationRank(l){
+  const p=(l?.p||'').toUpperCase();
+  if(p.startsWith('C:\\')) return 0;
+  if(p.startsWith('E:\\')) return 2;
+  return 1;
+}
+function itemPriority(x){
+  const locs=x.loc||[];
+  const internal=locs.some(l=>locationRank(l)===0)?1000:0;
+  const metadata=(x.imdb?120:0)+(x.s?80:0)+(x.r!=null?30:0)+(x.d?20:0)+(x.a?.length||0)*4+(x.g?.length||0)*3;
+  return internal+metadata;
+}
+function dedupeCatalog(items){
+  const groups=new Map();
+  for(const x of items){
+    const base=x.imdb
+      ? 'imdb:'+x.imdb
+      : 'title:'+canonicalTitle(x.title)+'|'+(x.year||'')+'|'+x.kind;
+    if(!groups.has(base)) groups.set(base,[]);
+    groups.get(base).push(x);
+  }
+  const out=[];
+  for(const group of groups.values()){
+    group.sort((a,b)=>itemPriority(b)-itemPriority(a));
+    const best={...group[0]};
+    const locMap=new Map();
+    for(const x of group){
+      for(const l of (x.loc||[])){
+        if(l?.p && !locMap.has(l.p)) locMap.set(l.p,l);
+      }
+      if(!best.s && x.s) best.s=x.s;
+      if(!best.poster && x.poster) best.poster=x.poster;
+      if(!best.director && x.director) best.director=x.director;
+      if(!best.imdb && x.imdb) best.imdb=x.imdb;
+      if(best.r==null && x.r!=null) best.r=x.r;
+      if(!best.d && x.d) best.d=x.d;
+      if((!best.a||!best.a.length) && x.a?.length) best.a=x.a;
+      if((!best.g||!best.g.length) && x.g?.length) best.g=x.g;
+      if((!best.k||!best.k.length) && x.k?.length) best.k=x.k;
+    }
+    best.loc=[...locMap.values()].sort((a,b)=>locationRank(a)-locationRank(b));
+    best.copies=Math.max(group.length,best.loc.length,best.copies||1);
+    best.key=best.imdb?'imdb:'+best.imdb:canonicalTitle(best.title)+'|'+(best.year||'');
+    out.push(best);
+  }
+  return out;
+}
+const DATA=dedupeCatalog(RAW_DATA);
 
 let seed=1;
 let randomFive=null;
@@ -44,7 +98,10 @@ const TOPICS=[
   ['esclavage',/slavery|slave/],['droits civiques',/civil rights|segregat|racism/],
   ['finance',/wall street|banker|financial|stock market/],['médias',/journalist|media|newspaper/],
   ['kidnapping',/kidnap|abduct|disappear/],['nature',/wildlife|forest|jungle|ecosystem/],
-  ['climat',/climate|environment|pollution/],['île',/island/],['huis clos',/bunker|trapped|locked|confined/]
+  ['climat',/climate|environment|pollution/],['île',/island/],['huis clos',/bunker|trapped|locked|confined/],
+  ['orques',/orca|killer whale/],['captivité',/captive|captivity/],['parc marin',/seaworld|marine park/],
+  ['réplicants',/replicant/],['dystopie',/dystopia|dystopian/],['super-héros',/superhero/],
+  ['quête',/quest|searches for|sets out to find/],['disparition',/disappear|missing person/],['île isolée',/isolated island/]
 ];
 
 function kindLabel(k){return k==='tv'?'SÉRIE':k==='collection'?'COLLECTION':k==='unknown'?'À IDENTIFIER':'FILM'}
@@ -56,10 +113,20 @@ function microKeywords(x){
   const out=[...(x.k||[])];
   const text=norm([x.s,(x.g||[]).join(' '),x.title].join(' '));
   for(const [label,re] of TOPICS){
-    if(out.length>=4)break;
+    if(out.length>=5)break;
     if(re.test(text) && !out.some(v=>norm(v)===norm(label))) out.push(label);
   }
-  return out.slice(0,4);
+  return out.slice(0,5);
+}
+
+function microPitch(x){
+  let t=(x.s||'').replace(/\s+/g,' ').trim();
+  if(!t) return x.kind==='collection' ? 'Collection à explorer' : '';
+  const max=145;
+  if(t.length<=max) return t;
+  const cut=t.slice(0,max);
+  const safe=cut.slice(0,Math.max(cut.lastIndexOf(' '),105));
+  return safe.replace(/[,:;\s]+$/,'')+'…';
 }
 
 function posterUrl(x){
@@ -165,7 +232,8 @@ function locationHtml(x){
 function row(x){
   const genres=(x.g||[]).slice(0,2).map(genreLabel);
   const actors=(x.a||[]).slice(0,2);
-  const words=microKeywords(x).slice(0,3);
+  const words=microKeywords(x).slice(0,4);
+  const pitch=microPitch(x);
   return `<article class="row">
     <div class="mainrow">
       <div class="scanline">
@@ -177,6 +245,7 @@ function row(x){
         <span class="duration-inline">${fmtDur(x.d)||'—'}</span>
         ${actors.length?`<span class="actors">${esc(actors.join(', '))}</span>`:''}
         ${words.length?`<span class="keywords">${esc(words.join(' · '))}</span>`:''}
+        ${pitch?`<span class="pitch-inline">${esc(pitch)}</span>`:''}
       </div>
       <span class="arrow">⌄</span>
     </div>
