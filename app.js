@@ -1,7 +1,7 @@
 const RAW_DATA=(window.CHOOSE_DATA||[]).map(x=>({
   title:x.t,year:x.y||null,kind:x.k||'movie',copies:x.c||1,enriched:!!x.e,
   r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',
-  poster:x.p||'',director:x.dir||'',imdb:x.id||'',loc:x.loc||[],
+  poster:x.p||'',director:x.dir||'',imdb:x.id||'',loc:x.loc||[],orig:x.orig||x.t,
   key:((x.t||'')+'|'+(x.y||''))
 }));
 
@@ -173,13 +173,17 @@ function displayTitle(x){
   const locs=relevantLocations(x);
   const vf=locs.find(l=>isFrenchMarked(sourceRaw(l)));
   if(vf){
-    const t=cleanLocalTitle(sourceRaw(vf),x.year);
-    if(t.length>1) return t;
+    const rawTitle=cleanLocalTitle(sourceRaw(vf),x.year);
+    if(rawTitle.length>1) return rawTitle;
   }
   const frenchish=locs.find(l=>looksFrenchTitle(sourceRaw(l)));
   if(frenchish){
-    const t=cleanLocalTitle(sourceRaw(frenchish),x.year);
-    if(t.length>1 && looksFrenchTitle(t)) return t;
+    const rawTitle=cleanLocalTitle(sourceRaw(frenchish),x.year);
+    if(rawTitle.length>1 && looksFrenchTitle(rawTitle)) return rawTitle;
+  }
+  if(x.orig && x.orig!==x.title){
+    const rawOrig=cleanLocalTitle(x.orig,x.year);
+    if(rawOrig.length>1 && looksFrenchTitle(rawOrig)) return rawOrig;
   }
   return x.title;
 }
@@ -297,11 +301,13 @@ function locationHtml(x){
   }
   return locs.map(l=>{
     const raw=sourceRaw(l);
-    let root=l.p;
-    if(raw && root.toLowerCase().endsWith(('\\'+raw).toLowerCase())){
-      root=root.slice(0,root.length-raw.length-1);
-    }else{
-      root=root.replace(/\\[^\\]+$/,'');
+    let root=l.b||l.p;
+    if(!l.b){
+      if(raw && root.toLowerCase().endsWith(('\\'+raw).toLowerCase())){
+        root=root.slice(0,root.length-raw.length-1);
+      }else{
+        root=root.replace(/\\[^\\]+$/,'');
+      }
     }
     const explorerUrl='search-ms:query='+encodeURIComponent(raw||displayTitle(x))+'&crumb=location:'+encodeURIComponent(root);
     return `<div class="location-row">
