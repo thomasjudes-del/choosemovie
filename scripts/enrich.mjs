@@ -127,13 +127,39 @@ const FORCED=new Map([
   ["Mr Quigley L'australien",{id:"tt0102744",type:"movie"}],
   ["Origin - Spirits Of The Past",{id:"tt0493247",type:"movie"}],
   ["The Realm",{id:"tt7095482",type:"movie"}],
-  ["Blanche - Bernie Bonvoisin -- Francais",{id:"tt0302346",type:"movie"}]
+  ["Blanche - Bernie Bonvoisin -- Francais",{id:"tt0302346",type:"movie"}],
+  ["9",{id:"tt0472033",type:"movie"}],
+  ["Dans La Peau De Jacques Chirac -OTHERS-D3M0N",{id:"tt0798417",type:"movie"}],
+  ["Dolphins And Whales 3D Tribes Of The Ocean",{id:"tt0996382",type:"movie"}],
+  ["ENFERMES DEHORS",{id:"tt0442207",type:"movie"}],
+  ["Folles de joie",{id:"tt4621872",type:"movie"}],
+  ["LA CITE DE LA PEUR by gayain",{id:"tt0109440",type:"movie"}],
+  ["La Tour Montparnasse Infernale francais DivX",{id:"tt0259060",type:"movie"}],
+  ["Le Mur de l'Atlantique",{id:"tt0066108",type:"movie"}],
+  ["Le père tranquille (Noël-Noël,Nadine Alari)",{id:"tt0038863",type:"movie"}],
+  ["Les Barbouzes",{id:"tt0057870",type:"movie"}],
+  ["Les Dalton -TheNewSquad By FTT",{id:"tt0368668",type:"movie"}],
+  ["LES DISPARUS DE SAINT AGIL",{id:"tt0030062",type:"movie"}],
+  ["Les Sous Doue Passent Le Bac",{id:"tt0081541",type:"movie"}],
+  ["Les Vieux de la Vieille-Jean Gabin, Pierre Fresnay, Francis Blanche-Fr",{id:"tt0054441",type:"movie"}],
+  ["Louis De Funès - Faites sauter la banque",{id:"tt0057051",type:"movie"}],
+  ["louis de funes Le Majordome - De Funes, Meurisse, Bourvil",{id:"tt0059419",type:"movie"}],
+  ["louis de funes Le Petit Baigneur Fr -Dvd Rip Par Mikemarie(Excellent) testé",{id:"tt0062120",type:"movie"}],
+  ["Louis De Funes - Pouic Pouic Fr",{id:"tt0057422",type:"movie"}],
+  ["Louis Funes - La Grande Vadrouille",{id:"tt0060474",type:"movie"}],
+  ["The Tale Of Peter Rabbit",{id:"tt1572314",type:"movie"}],
+  ["Thomas Sowell Common Sense In A Senseless World A Personal Exploration By Jason Riley",{id:"tt13087910",type:"movie"}],
+  ["To Gerard",{id:"tt11952320",type:"movie"}],
+  ["Touchez pas au grisbi",{id:"tt0046451",type:"movie"}],
+  ["Willy 1er",{id:"tt5698748",type:"movie"}],
+  ["Wonderful Days",{id:"tt0353014",type:"movie"}],
+  ["Zidane A 21st Century Portrait",{id:"tt0478337",type:"movie"}],
+  ["DIEUDONNE - Le Divorce De Patrick",{id:"tt0439162",type:"movie"}]
 ]);
 
 const SKIP_MATCH=new Set([
   "A Voix Haute Doc HDTVx264",
   "Arte - Quand les poissons disparaissent",
-  "DIEUDONNE - Le Divorce De Patrick",
   "L'orque",
   "National Geographic - Les Orque",
   "Reportage Arte - Les Secrets De La Jungle D'afrique - Les Fourmis - Docu Fr Tvdivx5 11 2P Dodelio",
@@ -225,6 +251,31 @@ function strippedOriginal(item){
   };
 }
 
+function deriveKeywords(description='',genres=[],existing=[]){
+  const out=[...existing];
+  const text=norm(description+' '+genres.join(' '));
+  const concepts=[
+    [/zombie/,'zombies'],[/(pandemic|epidemic|virus|disease|infect)/,'pandémie'],
+    [/(alien|extraterrestrial|ufo)/,'extraterrestres'],[/(space|astronaut|mars|galaxy|planet)/,'espace'],
+    [/(time travel|time loop|future|past)/,'temps'],[/(war|soldier|army|battle|military)/,'guerre'],
+    [/(spy|espionage|secret agent|cia|fbi)/,'espionnage'],[/(detective|murder|investigat|killer|police)/,'enquête'],
+    [/(prison|jail)/,'prison'],[/(revenge|vengeance)/,'vengeance'],[/(family|father|mother|daughter|son)/,'famille'],
+    [/(love|romance|relationship|couple)/,'amour'],[/(music|musician|piano|pianist|jazz|band)/,'musique'],
+    [/(football|soccer|baseball|boxing|sport|athlete)/,'sport'],[/(school|student|teacher|college)/,'école'],
+    [/(robot|android|artificial intelligence|\bai\b)/,'IA / robots'],[/(apocalyp|postapocalyp)/,'apocalypse'],
+    [/(dystop)/,'dystopie'],[/(surviv)/,'survie'],[/(heist|robbery|bank rob)/,'braquage'],
+    [/(politic|government|president|corrupt)/,'politique'],[/(court|lawyer|trial|judge)/,'justice'],
+    [/(ocean|sea|whale|dolphin|shark)/,'océan'],[/(dog|cat|animal)/,'animaux'],
+    [/(magic|witch|wizard|sorcer)/,'magie'],[/(cowboy|western|sheriff)/,'western'],
+    [/(mafia|gangster|cartel|organized crime)/,'crime organisé']
+  ];
+  for(const [re,label] of concepts){
+    if(re.test(text) && !out.includes(label))out.push(label);
+    if(out.length>=5)break;
+  }
+  return out.slice(0,5);
+}
+
 function resultFromMeta(item,meta,type,id,score=200){
   const cast=(Array.isArray(meta.cast)?meta.cast:peopleFromLinks(meta,'actor')).filter(Boolean);
   const directors=(Array.isArray(meta.director)?meta.director:peopleFromLinks(meta,'director')).filter(Boolean);
@@ -241,7 +292,7 @@ function resultFromMeta(item,meta,type,id,score=200){
     d:parseRuntime(meta.runtime)||null,
     g:genres.length?genres:(item.g||[]),
     a:cast.slice(0,12),
-    w:item.w||[],
+    w:deriveKeywords(meta.description||'',genres,item.w||[]),
     s:meta.description||'',
     p:meta.poster||'',
     dir:directors.join(', '),
