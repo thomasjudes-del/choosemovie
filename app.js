@@ -65,6 +65,11 @@ function posterUrl(x){
   return x.poster||'';
 }
 
+function trailerUrl(x){
+  const q=[x.title,x.year||'',x.kind==='tv'?'official series trailer':'official trailer','English'].filter(Boolean).join(' ');
+  return 'https://www.youtube.com/results?search_query='+encodeURIComponent(q);
+}
+
 function getGenres(){
   return [...new Set(DATA.flatMap(x=>x.g||[]))].sort((a,b)=>genreLabel(a).localeCompare(genreLabel(b),'fr'));
 }
@@ -164,6 +169,7 @@ function row(x){
                 ${x.r?`<span class="detailrating">★ ${x.r.toFixed(1)} IMDb</span>`:''}
                 ${x.d?`<span>${fmtDur(x.d)}</span>`:''}
                 ${(x.g||[]).length?`<span>${esc((x.g||[]).map(genreLabel).join(' / '))}</span>`:''}
+                ${x.kind!=='collection'&&x.kind!=='unknown'?`<a class="trailer-btn" href="${esc(trailerUrl(x))}" target="_blank" rel="noopener noreferrer">▶ Trailer EN · YouTube</a>`:''}
               </div>
             </div>
           </div>
