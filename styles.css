@@ -54,7 +54,7 @@ button,select,input{font:inherit}
 main{max-width:1580px;margin:auto;padding:16px 20px 70px}
 .bar{
   position:sticky;top:58px;z-index:15;
-  display:grid;grid-template-columns:minmax(300px,1fr) auto;gap:9px;align-items:center;
+  display:grid;grid-template-columns:minmax(280px,1fr) auto auto;gap:9px;align-items:center;
   padding:9px;
   border:1px solid rgba(255,255,255,.09);
   border-radius:15px;
@@ -130,7 +130,7 @@ select{height:42px;border:1px solid #d8dce2;border-radius:10px;background:#fff;c
 .location-empty{font-size:11px;color:#8b8f95;font-style:italic}
 .empty{padding:55px;text-align:center;color:#d0d3d8}
 @media(max-width:1050px){
-  .bar{grid-template-columns:1fr;top:57px}.filters{overflow:auto;flex-wrap:nowrap}
+  .bar{grid-template-columns:1fr;top:57px}.storage-switch{justify-content:flex-start;width:max-content}.filters{overflow:auto;flex-wrap:nowrap}
   .scanline{overflow-x:auto;scrollbar-width:none}.scanline::-webkit-scrollbar{display:none}
   .title{max-width:220px}
 }
@@ -142,3 +142,12 @@ select{height:42px;border:1px solid #d8dce2;border-radius:10px;background:#fff;c
 }
 .trailer-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none;border-radius:999px;padding:5px 9px;background:#f3e8e8;color:#9b2f3d;font-weight:850;border:1px solid #ead1d4}
 .trailer-btn:hover{background:#eedcde;border-color:#d9afb5}
+
+.storage-switch{display:flex;gap:4px;padding:3px;border-radius:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10)}
+.storage-btn{height:36px;border:0;border-radius:8px;padding:0 10px;background:transparent;color:#cdd2da;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+.storage-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.storage-btn.active{background:#f6f3ec;color:#16181c;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.drive-tag{display:inline-flex;align-items:center;justify-content:center;min-width:25px;border-radius:999px;padding:3px 6px;font-size:9px!important;letter-spacing:.04em}
+.drive-c{background:#e7f2ff;color:#1c5f9d!important}
+.drive-e{background:#fff0d7;color:#925d0a!important}
+.pill.warning{background:rgba(255,199,91,.16);border-color:rgba(255,199,91,.22);color:#f3d49a}
