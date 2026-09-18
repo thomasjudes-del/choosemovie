@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <title>ChooseMovie</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand">ChooseMovie</div>
+      <div class="tagline">Ta vidéothèque, lisible en un clin d'œil.</div>
+    </div>
+    <div class="top-actions">
+      <button id="randomBtn" class="ghost">↻ Au hasard</button>
+      <button id="importBtn" class="ghost">Importer</button>
+      <button id="settingsBtn" class="primary">TMDB</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="onboarding" class="onboarding hidden">
+      <div class="onboarding-card">
+        <div class="eyebrow">Aucune bibliothèque chargée</div>
+        <h1>Importe ton export AI Context Basket.</h1>
+        <p>ChooseMovie lit directement les lignes <code>[DIR]</code> et <code>[FILE]</code>, déduplique les titres et garde tes données dans ce navigateur.</p>
+        <button id="onboardingImportBtn" class="primary big">Choisir le fichier .txt</button>
+        <p class="subtle">Aucun chemin local ni catalogue personnel n'est envoyé sur GitHub.</p>
+      </div>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="stats" id="stats"></div>
+
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" placeholder="Titre, acteur, mot-clé, genre…" autocomplete="off" />
+          <button id="clearSearchBtn" class="icon-btn" aria-label="Effacer">×</button>
+        </div>
+        <div class="filters">
+          <select id="kindFilter">
+            <option value="all">Films + séries</option>
+            <option value="movie">Films</option>
+            <option value="tv">Séries</option>
+            <option value="collection">Collections</option>
+            <option value="unknown">Non identifiés</option>
+          </select>
+          <select id="genreFilter"><option value="all">Tous les genres</option></select>
+          <select id="ratingFilter">
+            <option value="0">Toute note</option>
+            <option value="6">TMDB ≥ 6</option>
+            <option value="7">TMDB ≥ 7</option>
+            <option value="8">TMDB ≥ 8</option>
+          </select>
+          <select id="runtimeFilter">
+            <option value="0">Toute durée</option>
+            <option value="90">≤ 1h30</option>
+            <option value="120">≤ 2h</option>
+            <option value="150">≤ 2h30</option>
+          </select>
+          <select id="sortSelect">
+            <option value="title">A → Z</option>
+            <option value="rating">Mieux notés</option>
+            <option value="year">Plus récents</option>
+            <option value="random">Mélanger</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="result-line">
+        <div id="resultCount"></div>
+        <div id="enrichHint" class="subtle"></div>
+      </div>
+
+      <div id="movieList" class="movie-list"></div>
+      <div id="emptyState" class="empty hidden">Aucun titre avec ces filtres.</div>
+    </section>
+  </main>
+
+  <input id="fileInput" type="file" accept=".txt,text/plain" hidden />
+
+  <dialog id="settingsDialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="settingsForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">Enrichissement</div>
+          <h2>TMDB</h2>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Fermer">×</button>
+      </div>
+      <p>Le token reste uniquement dans le stockage local de ce navigateur. Il n'est jamais ajouté au repo.</p>
+      <label>
+        API Read Access Token
+        <input id="tokenInput" type="password" placeholder="eyJhbGciOiJIUzI1NiJ9…" autocomplete="off" />
+      </label>
+      <div class="dialog-actions wrap">
+        <button id="saveTokenBtn" type="button" class="primary">Enregistrer</button>
+        <button id="enrichBtn" type="button" class="primary">Enrichir les titres</button>
+        <button id="stopEnrichBtn" type="button" class="ghost hidden">Arrêter</button>
+      </div>
+      <div id="enrichProgressWrap" class="progress-wrap hidden">
+        <div class="progress"><div id="enrichProgressBar"></div></div>
+        <div id="enrichProgressText" class="subtle"></div>
+      </div>
+      <hr />
+      <div class="dialog-actions wrap">
+        <button id="exportBtn" type="button" class="ghost">Exporter le catalogue</button>
+        <button id="resetBtn" type="button" class="danger">Réinitialiser</button>
+      </div>
+      <p class="subtle">La note affichée est la moyenne utilisateurs TMDB. Pour une série, la durée affichée correspond à la durée habituelle d'un épisode.</p>
+    </form>
+  </dialog>
+
+  <template id="rowTemplate">
+    <article class="movie-row">
+      <button class="row-main" type="button">
+        <div class="poster-mini-wrap"><img class="poster-mini" alt="" loading="lazy" /><div class="poster-fallback">◫</div></div>
+        <div class="row-content">
+          <div class="row-title-line">
+            <span class="row-title"></span>
+            <span class="row-year"></span>
+            <span class="badge row-kind"></span>
+          </div>
+          <div class="row-meta"></div>
+          <div class="row-tags"></div>
+        </div>
+        <div class="row-right">
+          <div class="rating"></div>
+          <div class="runtime"></div>
+          <div class="chevron">⌄</div>
+        </div>
+      </button>
+      <div class="details hidden"></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
