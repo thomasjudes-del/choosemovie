@@ -90,6 +90,6 @@ function row(x){
 }
 
 ['q','type','genre','rating','dur','sort'].forEach(id=>$(id).addEventListener(id==='q'?'input':'change',render));
-$('random').onclick=()=>{onlyReady=true;$('sort').value='random';seed++;render();window.scrollTo({top:0,behavior:'smooth'})};
-$('onlyReady').onclick=()=>{onlyReady=!onlyReady;$('onlyReady').textContent=onlyReady?'Voir toute la bibliothèque':'Voir les enrichis';render()};
+$('random').onclick=()=>{$('sort').value='random';seed++;render();window.scrollTo({top:0,behavior:'smooth'})};
+
 render();
