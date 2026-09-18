@@ -44,3 +44,5 @@ select{height:44px;border:1px solid var(--line);border-radius:11px;background:#f
 .facts{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:#666}.facts b{color:#111}
 .empty{padding:50px;text-align:center;color:#888}
 @media(max-width:900px){.bar{grid-template-columns:1fr}.filters{overflow:auto;flex-wrap:nowrap}.scanline{overflow:auto}.summary{min-width:280px}.detailgrid{grid-template-columns:105px 1fr}.posterwrap,.poster,.posterplaceholder{width:105px}.dur{display:none}}
+
+.badge.unknown{background:#f2f2f2;color:#666}
