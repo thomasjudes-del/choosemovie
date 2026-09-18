@@ -1,12 +1,30 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { execFileSync } from 'node:child_process';
 
-const ctx={window:{}};
-vm.createContext(ctx);
-for(const file of ['data-01.js','data-02.js','data-03.js','data-04.js']){
-  vm.runInContext(fs.readFileSync(file,'utf8'),ctx,{filename:file});
+const FILES=['data-01.js','data-02.js','data-03.js','data-04.js'];
+const SOURCE_REF='82814ebbc01f0f0380f00d0f9e575dacc53b29a6';
+
+function loadCatalog(contentsByFile){
+  const ctx={window:{}};
+  vm.createContext(ctx);
+  for(const [file,content] of contentsByFile){
+    vm.runInContext(content,ctx,{filename:file});
+  }
+  return ctx.window.CHOOSE_DATA||[];
 }
-const source=ctx.window.CHOOSE_DATA||[];
+
+const existing=loadCatalog(FILES.map(file=>[file,fs.readFileSync(file,'utf8')]));
+let source;
+try{
+  source=loadCatalog(FILES.map(file=>[
+    file,
+    execFileSync('git',['show',SOURCE_REF+':'+file],{encoding:'utf8'})
+  ]));
+}catch(e){
+  console.warn('Could not load original catalog ref, using current catalog:',String(e.message||e));
+  source=existing.map(x=>({...x}));
+}
 
 const ALIASES=new Map([
   ["3 BODY PROBLEM",{q:"3 Body Problem",type:"series"}],
@@ -79,6 +97,51 @@ const ALIASES=new Map([
 ]);
 const COLLECTION_NAMES=new Set([
   "CHRISTOPHER NOLAN dont Batman","DA et ANIMATION","DBZ","DBZ Kai et movies","FILMS EN ARABE ou recents"
+]);
+
+const FORCED=new Map([
+  ["Dune",{id:"tt1160419",type:"movie"}],
+  ["Blade Runner",{id:"tt0083658",type:"movie"}],
+  ["Charlie Wilsons War",{id:"tt0472062",type:"movie"}],
+  ["conte princesse Kaguya-hime no Monogatari",{id:"tt2576852",type:"movie"}],
+  ["Kaguya-hime no Monogatari",{id:"tt2576852",type:"movie"}],
+  ["Enki Bilal - Immortel Ad Vitam (fr)",{id:"tt0314063",type:"movie"}],
+  ["Festen - Thomas Vinterbergh - Vo St Fr (Rippé & Encodé Par Tilt Lyon)",{id:"tt0154420",type:"movie"}],
+  ["Good Morning England TS MD MZISYS",{id:"tt1131729",type:"movie"}],
+  ["Inglorious Bastards",{id:"tt0361748",type:"movie"}],
+  ["L'Aile Ou La Cuisse - Louis De Funes",{id:"tt0074103",type:"movie"}],
+  ["Louis De Funès - L'aile ou la cuisse - DivX Fr",{id:"tt0074103",type:"movie"}],
+  ["La Legende Du Scorpion Noir Vrai By Bf15",{id:"tt0465676",type:"movie"}],
+  ["La Traversée De Paris (Bourvil, Jean Gabin, Louis De Funes)",{id:"tt0049877",type:"movie"}],
+  ["LE CAVE SE REBIFFE FR VVF COOLI",{id:"tt0054734",type:"movie"}],
+  ["Le Chacal FR",{id:"tt0069947",type:"movie"}],
+  ["Le Clan Des Siciliens",{id:"tt0064169",type:"movie"}],
+  ["Le Scaphandre Et Le Papillon Eng hard subs fw",{id:"tt0401383",type:"movie"}],
+  ["Le Verdict - eng",{id:"tt0084855",type:"movie"}],
+  ["Les Oiseaux - Hitchcock testé par",{id:"tt0056869",type:"movie"}],
+  ["Louis Funes - Le grand restaurant",{id:"tt0061728",type:"movie"}],
+  ["Louis Funes - Oscar",{id:"tt0062083",type:"movie"}],
+  ["Monty Python - And Now for Something Completely Different",{id:"tt0066765",type:"movie"}],
+  ["monty python - The Meaning of life",{id:"tt0085959",type:"movie"}],
+  ["Monty Pythons - Life of Brian",{id:"tt0079470",type:"movie"}],
+  ["Mr Quigley L'australien",{id:"tt0102744",type:"movie"}],
+  ["Origin - Spirits Of The Past",{id:"tt0493247",type:"movie"}],
+  ["The Realm",{id:"tt7095482",type:"movie"}],
+  ["Blanche - Bernie Bonvoisin -- Francais",{id:"tt0302346",type:"movie"}]
+]);
+
+const SKIP_MATCH=new Set([
+  "A Voix Haute Doc HDTVx264",
+  "Arte - Quand les poissons disparaissent",
+  "DIEUDONNE - Le Divorce De Patrick",
+  "L'orque",
+  "National Geographic - Les Orque",
+  "Reportage Arte - Les Secrets De La Jungle D'afrique - Les Fourmis - Docu Fr Tvdivx5 11 2P Dodelio",
+  "Reportage - Regne Animal - Fourmis Tueuses",
+  "Rugby - France vs All-Blacks 06 Oct",
+  "Thalassa - Australie - la grande barriere de Corail",
+  "Thalassa - le mystère des baleines",
+  "movie 75095 MPEG2"
 ]);
 
 
@@ -155,10 +218,65 @@ async function detail(type,id){
   const j=await getJson('https://v3-cinemeta.strem.io/meta/'+type+'/'+id+'.json');
   return j.meta||null;
 }
+function strippedOriginal(item){
+  return {
+    t:item.t,y:item.y||null,k:item.k||'movie',c:item.c||1,e:0,
+    r:null,d:null,g:item.g||[],a:[],w:item.w||[],s:'',p:'',dir:'',id:''
+  };
+}
+
+function resultFromMeta(item,meta,type,id,score=200){
+  const cast=(Array.isArray(meta.cast)?meta.cast:peopleFromLinks(meta,'actor')).filter(Boolean);
+  const directors=(Array.isArray(meta.director)?meta.director:peopleFromLinks(meta,'director')).filter(Boolean);
+  const genres=(meta.genres||peopleFromLinks(meta,'genre')).filter(Boolean);
+  const y=yearOf(meta)||item.y||null;
+  const rating=Number(meta.imdbRating)||null;
+  return {
+    t:meta.name||item.t,
+    y,
+    k:type==='series'?'tv':'movie',
+    c:item.c||1,
+    e:1,
+    r:rating?Number(rating):null,
+    d:parseRuntime(meta.runtime)||null,
+    g:genres.length?genres:(item.g||[]),
+    a:cast.slice(0,12),
+    w:item.w||[],
+    s:meta.description||'',
+    p:meta.poster||'',
+    dir:directors.join(', '),
+    id,
+    ms:score
+  };
+}
+
+function safeExisting(item,prev){
+  if(!prev?.e || !prev.id)return false;
+  if(ALIASES.has(item.t) || FORCED.has(item.t) || SKIP_MATCH.has(item.t))return false;
+  if(item.y && prev.y && Math.abs(item.y-prev.y)>2)return false;
+  const src=tokens(item.t), dst=tokens(prev.t);
+  if(dst.size===1 && src.size>=3)return false;
+  const similarity=sim(item.t,prev.t);
+  if(similarity>=45)return true;
+  if((prev.ms||0)>=120 && (!item.y || !prev.y || Math.abs(item.y-prev.y)<=2))return true;
+  return false;
+}
+
 async function enrichOne(item,index){
-  if(item.e && item.p && item.s && item.r)return item;
-  if(COLLECTION_NAMES.has(item.t))return {...item,k:'collection',e:1};
-  if(item.k==='collection')return {...item,e:1};
+  const prev=existing[index];
+  if(SKIP_MATCH.has(item.t))return strippedOriginal(item);
+  if(COLLECTION_NAMES.has(item.t))return {...strippedOriginal(item),k:'collection',e:1};
+  if(item.k==='collection')return {...strippedOriginal(item),k:'collection',e:1};
+  const forced=FORCED.get(item.t);
+  if(forced){
+    try{
+      const meta=await detail(forced.type,forced.id);
+      if(meta)return resultFromMeta(item,meta,forced.type,forced.id,250);
+    }catch(e){
+      console.warn('Forced lookup failed',item.t,forced.id,String(e.message||e));
+    }
+  }
+  if(safeExisting(item,prev))return {...prev,w:item.w?.length?item.w:prev.w||[]};
   const alias=ALIASES.get(item.t);
   const q=alias?.q||cleanTitle(item.t);
   if(q.length<2)return {...item,e:item.e||0};
@@ -176,28 +294,11 @@ async function enrichOne(item,index){
   if(!best||best.s<68)return {...item,e:item.e||0};
   let meta=best.c;
   try{meta=await detail(best.c.type,best.c.id)||best.c}catch{}
-  const cast=(Array.isArray(meta.cast)?meta.cast:peopleFromLinks(meta,'actor')).filter(Boolean);
-  const directors=(Array.isArray(meta.director)?meta.director:peopleFromLinks(meta,'director')).filter(Boolean);
-  const genres=(meta.genres||peopleFromLinks(meta,'genre')).filter(Boolean);
-  const y=yearOf(meta)||item.y||null;
-  const rating=Number(meta.imdbRating||best.c.imdbRating)||item.r||null;
-  return {
-    t:meta.name||best.c.name||item.t,
-    y,
-    k:best.c.type==='series'?'tv':'movie',
-    c:item.c||1,
-    e:1,
-    r:rating?Number(rating):null,
-    d:parseRuntime(meta.runtime)||item.d||null,
-    g:genres.length?genres:item.g||[],
-    a:cast.length?cast.slice(0,12):item.a||[],
-    w:item.w||[],
-    s:meta.description||best.c.description||item.s||'',
-    p:meta.poster||best.c.poster||item.p||'',
-    dir:directors.join(', ')||item.dir||'',
-    id:best.c.id||item.id||'',
-    ms:Math.round(best.s)
-  };
+  const built=resultFromMeta(item,meta,best.c.type,best.c.id,Math.round(best.s));
+  if(!built.r && best.c.imdbRating)built.r=Number(best.c.imdbRating)||null;
+  if(!built.s)built.s=best.c.description||'';
+  if(!built.p)built.p=best.c.poster||'';
+  return built;
 }
 
 const out=new Array(source.length);
