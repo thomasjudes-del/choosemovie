@@ -309,7 +309,7 @@ function locationHtml(x){
         root=root.replace(/\\[^\\]+$/,'');
       }
     }
-    const explorerUrl='search-ms:query='+encodeURIComponent(raw||displayTitle(x))+'&crumb=location:'+encodeURIComponent(root);
+    const directUrl='choosemovie://open?path='+encodeURIComponent(l.p);
     return `<div class="location-row">
       <div class="location-text">
         <strong class="drive-tag drive-${locDrive(l).toLowerCase()}">${locDrive(l)}:</strong>
@@ -317,7 +317,7 @@ function locationHtml(x){
         <code title="${esc(l.p)}">${esc(l.p)}</code>
       </div>
       <div class="location-actions">
-        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Lancer Windows Explorer dans cette racine">🔎 Trouver dans Explorer</a>
+        <a class="mini-btn open-local" href="${esc(directUrl)}" title="Ouvrir directement cet emplacement dans l’Explorateur Windows">📁 Ouvrir</a>
         <button class="mini-btn copy-path" type="button" data-path="${esc(l.p)}">Copier</button>
       </div>
     </div>`;
@@ -378,7 +378,10 @@ function row(x){
           </div>
 
           <div class="locations">
-            <div class="section-label">Emplacement dans ta bibliothèque</div>
+            <div class="location-heading">
+              <div class="section-label">Emplacement dans ta bibliothèque</div>
+              <a class="helper-link" href="install-choosemovie.cmd" download>⚙ Activer l’ouverture directe (1×)</a>
+            </div>
             ${locationHtml(x)}
           </div>
         </div>
