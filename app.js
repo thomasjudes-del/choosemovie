@@ -61,7 +61,14 @@ function cleanCandidate(raw, entryType) {
   name = name.replace(/\b(?:eng|fr|vf|vo)\b$/i,'').trim();
   let kindHint = 'movie';
   if (entryType === 'DIR' && COLLECTION_PATTERNS.test(original)) kindHint = 'collection';
-  else if (SERIES_PATTERNS.test(original) || /S\d{2}E\d{2}/i.test(original)) kindHint = 'tv';
+  else if (SERIES_PATTERNS.test(original) || /S\d{1,2}E\d{1,2}/i.test(original)) kindHint = 'tv';
+  if (kindHint === 'tv') {
+    name = name.replace(/\bS\d{1,2}E\d{1,2}\b.*$/i, ' ')
+      .replace(/\b(?:season|saison)\s*\d+\b.*$/i, ' ')
+      .replace(/\bS\d{1,2}\b.*$/i, ' ')
+      .replace(/\s+(?:series|serie)\s*$/i, ' ');
+  }
+  name = name.replace(/[\s(\[{._-]+$/g, '').replace(/\s+/g, ' ').trim();
   return { title: name || original, year, kindHint };
 }
 
