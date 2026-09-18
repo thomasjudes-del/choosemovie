@@ -140,3 +140,5 @@ select{height:42px;border:1px solid #d8dce2;border-radius:10px;background:#fff;c
   .detail-facts{grid-template-columns:1fr}.detailtitle{font-size:20px}
   .location-row{align-items:flex-start;flex-direction:column}.location-actions{width:100%}
 }
+.trailer-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none;border-radius:999px;padding:5px 9px;background:#f3e8e8;color:#9b2f3d;font-weight:850;border:1px solid #ead1d4}
+.trailer-btn:hover{background:#eedcde;border-color:#d9afb5}
