@@ -109,6 +109,61 @@ function fmtDur(m){if(!m)return'';let h=Math.floor(m/60),n=m%60;return h?(h+'h'+
 function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function genreLabel(g){return GENRE_FR[g]||g}
 
+function sourceRaw(l){
+  return (l?.r || l?.p?.split('\\').pop() || '').trim();
+}
+
+function isEnglishMarked(raw=''){
+  return /\b(VOSTFR|VOST|VO|ENG|ENGLISH|ORIGINAL)\b/i.test(raw);
+}
+
+function isFrenchMarked(raw=''){
+  if(/\bVOSTFR\b/i.test(raw)) return false;
+  return /\b(VF|TRUEFRENCH|FRENCH|FRANCAIS|FRANÇAIS|FRA)\b/i.test(raw);
+}
+
+function looksFrenchTitle(raw=''){
+  if(isEnglishMarked(raw)) return false;
+  const t=norm(raw);
+  return /\b(le|la|les|un|une|des|du|de|au|aux|et|dans|mon|ma|mes|notre|nos|ce|cette|ces|avec|sans|pour|sur)\b/.test(t);
+}
+
+function cleanLocalTitle(raw='',year=null){
+  let t=raw
+    .replace(/\.(avi|mkv|mp4|m4v|mov|webm|mpg|mpeg|ts|zip|rar)$/i,'')
+    .replace(/[._]+/g,' ')
+    .replace(/\[[^\]]*\]/g,' ')
+    .replace(/\([^)]*(?:rip|encod|torrent|tested|testé|www|divx|dvd|bluray|webrip|web.?dl|hdtv|x26[45]|720p|1080p|2160p)[^)]*\)/gi,' ');
+  if(year){
+    const y=String(year);
+    const idx=t.indexOf(y);
+    if(idx>1) t=t.slice(0,idx);
+  }
+  t=t
+    .replace(/\b(VOSTFR|VOST|VO|VF|TRUEFRENCH|FRENCH|FRANCAIS|FRANÇAIS|FRA|ENG|ENGLISH)\b.*$/i,' ')
+    .replace(/\b(720p|1080p|2160p|4k|bluray|brrip|webrip|web.?dl|dvdrip|hdtv|x264|x265|hevc|divx)\b.*$/i,' ')
+    .replace(/\s+-\s+$/,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .replace(/^[0-9]+\s+(?=[A-Za-zÀ-ÿ])/,'');
+  return t;
+}
+
+function displayTitle(x){
+  const locs=[...(x.loc||[])].sort((a,b)=>locationRank(a)-locationRank(b));
+  const vf=locs.find(l=>isFrenchMarked(sourceRaw(l)));
+  if(vf){
+    const t=cleanLocalTitle(sourceRaw(vf),x.year);
+    if(t.length>1) return t;
+  }
+  const frenchish=locs.find(l=>looksFrenchTitle(sourceRaw(l)));
+  if(frenchish){
+    const t=cleanLocalTitle(sourceRaw(frenchish),x.year);
+    if(t.length>1 && looksFrenchTitle(t)) return t;
+  }
+  return x.title;
+}
+
 function microKeywords(x){
   const out=[...(x.k||[])];
   const text=norm([x.s,(x.g||[]).join(' '),x.title].join(' '));
@@ -152,7 +207,7 @@ function baseFiltered(){
     if(r&&(!x.r||x.r<r))return false;
     if(d&&(!x.d||x.d>d))return false;
     if(q){
-      let hay=norm([x.title,x.year,(x.g||[]).join(' '),(x.a||[]).join(' '),microKeywords(x).join(' '),x.s,x.director,(x.loc||[]).map(l=>l.p).join(' ')].join(' '));
+      let hay=norm([displayTitle(x),x.title,x.year,(x.g||[]).join(' '),(x.a||[]).join(' '),microKeywords(x).join(' '),x.s,x.director,(x.loc||[]).map(l=>l.p).join(' ')].join(' '));
       if(!hay.includes(q))return false;
     }
     return true;
@@ -169,7 +224,7 @@ function filtered(){
   if(s==='rating')a.sort((x,y)=>(y.r||-1)-(x.r||-1));
   else if(s==='year')a.sort((x,y)=>(y.year||0)-(x.year||0));
   else if(s==='random')a.sort((x,y)=>rand(x.key+seed)-rand(y.key+seed));
-  else a.sort((x,y)=>x.title.localeCompare(y.title,'fr'));
+  else a.sort((x,y)=>displayTitle(x).localeCompare(displayTitle(y),'fr'));
   return a;
 }
 
@@ -215,14 +270,15 @@ function locationHtml(x){
   return x.loc.map((l,i)=>{
     const isFile=l.t==='FILE';
     const folder=isFile?l.p.replace(/\\[^\\]+$/,''):l.p;
-    const fileUrl='file:///'+folder.replace(/\\/g,'/');
+    const filename=isFile?l.p.split('\\').pop():'';
+    const explorerUrl='search-ms:'+(filename?'query='+encodeURIComponent(filename)+'&':'')+'crumb=location:'+encodeURIComponent(folder);
     return `<div class="location-row">
       <div class="location-text">
         <strong>${esc(l.s||'Source')}</strong>
         <code title="${esc(l.p)}">${esc(l.p)}</code>
       </div>
       <div class="location-actions">
-        <a class="mini-btn open-local" href="${esc(fileUrl)}" target="_blank" rel="noreferrer">📁 Ouvrir</a>
+        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Ouvrir cet emplacement dans l’Explorateur Windows">📁 Explorer</a>
         <button class="mini-btn copy-path" type="button" data-path="${esc(l.p)}">Copier</button>
       </div>
     </div>`;
@@ -230,6 +286,7 @@ function locationHtml(x){
 }
 
 function row(x){
+  const shownTitle=displayTitle(x);
   const genres=(x.g||[]).slice(0,2).map(genreLabel);
   const actors=(x.a||[]).slice(0,2);
   const words=microKeywords(x).slice(0,4);
@@ -237,7 +294,7 @@ function row(x){
   return `<article class="row">
     <div class="mainrow">
       <div class="scanline">
-        <span class="title" title="${esc(x.title)}">${esc(x.title)}</span>
+        <span class="title" title="${esc(shownTitle)}">${esc(shownTitle)}</span>
         <span class="year">${x.year?'('+x.year+')':''}</span>
         <span class="badge ${x.kind}">${kindLabel(x.kind)}</span>
         ${genres.length?`<span class="genres">${esc(genres.join(' / '))}</span>`:''}
@@ -258,7 +315,7 @@ function row(x){
         <div class="detailbody">
           <div class="detailhead">
             <div>
-              <div class="detailtitle">${esc(x.title)} ${x.year?'<span>('+x.year+')</span>':''}</div>
+              <div class="detailtitle">${esc(shownTitle)} ${x.year?'<span>('+x.year+')</span>':''}</div>
               <div class="detailmeta">
                 <span class="badge ${x.kind}">${kindLabel(x.kind)}</span>
                 ${x.r?`<span class="detailrating">★ ${x.r.toFixed(1)} IMDb</span>`:''}
