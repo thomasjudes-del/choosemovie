@@ -63,7 +63,7 @@ function peopleFromLinks(meta,category){
 async function getJson(url,retries=2){
   for(let i=0;i<=retries;i++){
     try{
-      const r=await fetch(url,{headers:{'user-agent':'ChooseMovie/1.0'}});
+      const r=await fetch(url,{headers:{'user-agent':'ChooseMovie/1.0'},signal:AbortSignal.timeout(8000)});
       if(r.ok)return await r.json();
       if(i===retries)throw new Error(String(r.status));
     }catch(e){
@@ -122,7 +122,7 @@ async function enrichOne(item,index){
 
 const out=new Array(source.length);
 let cursor=0,done=0,matched=0;
-const workers=6;
+const workers=12;
 async function worker(){
   while(true){
     const i=cursor++;
@@ -131,7 +131,7 @@ async function worker(){
     catch(e){out[i]={...source[i],err:String(e.message||e)}}
     done++; if(out[i]?.e)matched++;
     if(done%25===0||done===source.length)console.log('progress',done+'/'+source.length,'enriched',matched);
-    await new Promise(r=>setTimeout(r,70));
+    await new Promise(r=>setTimeout(r,25));
   }
 }
 await Promise.all(Array.from({length:workers},worker));
