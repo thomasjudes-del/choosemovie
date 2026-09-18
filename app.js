@@ -6,6 +6,8 @@ const DATA=(window.CHOOSE_DATA||[]).map(x=>({
 }));
 
 let seed=1;
+let randomFive=null;
+let previousRandomKeys=new Set();
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
@@ -75,9 +77,9 @@ function getGenres(){
 }
 for(const g of getGenres()) $('genre').insertAdjacentHTML('beforeend',`<option value="${esc(g)}">${esc(genreLabel(g))}</option>`);
 
-function filtered(){
+function baseFiltered(){
   let q=norm($('q').value),type=$('type').value,genre=$('genre').value,r=+$('rating').value,d=+$('dur').value;
-  let a=DATA.filter(x=>{
+  return DATA.filter(x=>{
     if(type!=='all'&&x.kind!==type)return false;
     if(genre!=='all'&&!(x.g||[]).includes(genre))return false;
     if(r&&(!x.r||x.r<r))return false;
@@ -88,12 +90,36 @@ function filtered(){
     }
     return true;
   });
+}
+
+function filtered(){
+  let a=baseFiltered();
+  if(randomFive){
+    const chosen=new Set(randomFive);
+    return a.filter(x=>chosen.has(x.key)).sort((x,y)=>randomFive.indexOf(x.key)-randomFive.indexOf(y.key));
+  }
   let s=$('sort').value;
   if(s==='rating')a.sort((x,y)=>(y.r||-1)-(x.r||-1));
   else if(s==='year')a.sort((x,y)=>(y.year||0)-(x.year||0));
   else if(s==='random')a.sort((x,y)=>rand(x.key+seed)-rand(y.key+seed));
   else a.sort((x,y)=>x.title.localeCompare(y.title,'fr'));
   return a;
+}
+
+function pickRandomFive(){
+  const pool=baseFiltered();
+  if(!pool.length){ randomFive=[]; render(); return; }
+  let candidates=pool.filter(x=>!previousRandomKeys.has(x.key));
+  if(candidates.length<Math.min(5,pool.length)) candidates=[...pool];
+  for(let i=candidates.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [candidates[i],candidates[j]]=[candidates[j],candidates[i]];
+  }
+  const chosen=candidates.slice(0,Math.min(5,candidates.length));
+  randomFive=chosen.map(x=>x.key);
+  previousRandomKeys=new Set(randomFive);
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function rand(s){let h=0;for(const c of s)h=(Math.imul(h,31)+c.charCodeAt(0))|0;return (h>>>0)/4294967295}
@@ -209,7 +235,11 @@ document.addEventListener('click',async e=>{
   }
 });
 
-['q','type','genre','rating','dur','sort'].forEach(id=>$(id).addEventListener(id==='q'?'input':'change',render));
-$('random').onclick=()=>{$('sort').value='random';seed++;render();window.scrollTo({top:0,behavior:'smooth'})};
+['q','type','genre','rating','dur','sort'].forEach(id=>$(id).addEventListener(id==='q'?'input':'change',()=>{
+  randomFive=null;
+  previousRandomKeys=new Set();
+  render();
+}));
+$('random').onclick=pickRandomFive;
 
 render();
