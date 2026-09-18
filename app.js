@@ -62,6 +62,7 @@ const DATA=dedupeCatalog(RAW_DATA);
 let seed=1;
 let randomFive=null;
 let previousRandomKeys=new Set();
+let storageMode='C';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
@@ -149,8 +150,27 @@ function cleanLocalTitle(raw='',year=null){
   return t;
 }
 
+function locDrive(l){
+  const p=(l?.p||'').toUpperCase();
+  if(p.startsWith('C:\\')) return 'C';
+  if(p.startsWith('E:\\')) return 'E';
+  return '?';
+}
+
+function relevantLocations(x){
+  const locs=[...(x.loc||[])];
+  if(storageMode==='C') return locs.filter(l=>locDrive(l)==='C');
+  if(storageMode==='E') return locs.filter(l=>locDrive(l)==='E');
+  return locs.sort((a,b)=>locationRank(a)-locationRank(b));
+}
+
+function hasStorage(x){
+  if(storageMode==='BOTH') return true;
+  return (x.loc||[]).some(l=>locDrive(l)===storageMode);
+}
+
 function displayTitle(x){
-  const locs=[...(x.loc||[])].sort((a,b)=>locationRank(a)-locationRank(b));
+  const locs=relevantLocations(x);
   const vf=locs.find(l=>isFrenchMarked(sourceRaw(l)));
   if(vf){
     const t=cleanLocalTitle(sourceRaw(vf),x.year);
@@ -202,6 +222,7 @@ for(const g of getGenres()) $('genre').insertAdjacentHTML('beforeend',`<option v
 function baseFiltered(){
   let q=norm($('q').value),type=$('type').value,genre=$('genre').value,r=+$('rating').value,d=+$('dur').value;
   return DATA.filter(x=>{
+    if(!hasStorage(x)) return false;
     if(type!=='all'&&x.kind!==type)return false;
     if(genre!=='all'&&!(x.g||[]).includes(genre))return false;
     if(r&&(!x.r||x.r<r))return false;
@@ -248,12 +269,14 @@ function rand(s){let h=0;for(const c of s)h=(Math.imul(h,31)+c.charCodeAt(0))|0;
 
 function render(){
   const a=filtered(),en=DATA.filter(x=>x.enriched).length,tv=DATA.filter(x=>x.kind==='tv').length;
+  const cCount=DATA.filter(x=>(x.loc||[]).some(l=>locDrive(l)==='C')).length;
+  const eCount=DATA.filter(x=>(x.loc||[]).some(l=>locDrive(l)==='E')).length;
+  const unknownCount=DATA.filter(x=>!(x.loc||[]).length).length;
   $('stats').innerHTML=`
-    <span class=pill><b>${DATA.length}</b> titres</span>
-    <span class=pill><b>${en}</b> enrichis</span>
-    <span class=pill><b>${tv}</b> séries</span>
-    <span class=pill><b>${DATA.filter(x=>x.loc?.length).length}</b> localisés</span>
-    <span class=pill><b>${a.length}</b> affichés</span>`;
+    <span class=pill><b>${a.length}</b> affichés</span>
+    <span class=pill><b>${cCount}</b> sur C</span>
+    <span class=pill><b>${eCount}</b> sur E</span>
+    ${storageMode==='BOTH'&&unknownCount?`<span class="pill warning"><b>${unknownCount}</b> emplacement à confirmer</span>`:''}`;
   $('list').innerHTML=a.map(row).join('');
   $('empty').hidden=a.length>0;
 
@@ -266,19 +289,29 @@ function render(){
 }
 
 function locationHtml(x){
-  if(!x.loc?.length) return `<div class="location-empty">Emplacement local non retrouvé automatiquement.</div>`;
-  return x.loc.map((l,i)=>{
-    const isFile=l.t==='FILE';
-    const folder=isFile?l.p.replace(/\\[^\\]+$/,''):l.p;
-    const filename=isFile?l.p.split('\\').pop():'';
-    const explorerUrl='search-ms:'+(filename?'query='+encodeURIComponent(filename)+'&':'')+'crumb=location:'+encodeURIComponent(folder);
+  const locs=relevantLocations(x);
+  if(!locs.length){
+    return `<div class="location-empty">${storageMode==='BOTH'
+      ? 'Emplacement exact non retrouvé avec assez de certitude dans l’export actuel.'
+      : 'Pas de copie fiable identifiée sur '+storageMode+': dans l’export actuel.'}</div>`;
+  }
+  return locs.map(l=>{
+    const raw=sourceRaw(l);
+    let root=l.p;
+    if(raw && root.toLowerCase().endsWith(('\\'+raw).toLowerCase())){
+      root=root.slice(0,root.length-raw.length-1);
+    }else{
+      root=root.replace(/\\[^\\]+$/,'');
+    }
+    const explorerUrl='search-ms:query='+encodeURIComponent(raw||displayTitle(x))+'&crumb=location:'+encodeURIComponent(root);
     return `<div class="location-row">
       <div class="location-text">
+        <strong class="drive-tag drive-${locDrive(l).toLowerCase()}">${locDrive(l)}:</strong>
         <strong>${esc(l.s||'Source')}</strong>
         <code title="${esc(l.p)}">${esc(l.p)}</code>
       </div>
       <div class="location-actions">
-        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Ouvrir cet emplacement dans l’Explorateur Windows">📁 Ouvrir dans Explorer</a>
+        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Lancer Windows Explorer dans cette racine">🔎 Trouver dans Explorer</a>
         <button class="mini-btn copy-path" type="button" data-path="${esc(l.p)}">Copier</button>
       </div>
     </div>`;
@@ -360,6 +393,15 @@ document.addEventListener('click',async e=>{
     window.prompt('Copie le chemin :',btn.dataset.path||'');
   }
 });
+
+document.querySelectorAll('[data-storage]').forEach(btn=>btn.addEventListener('click',()=>{
+  storageMode=btn.dataset.storage;
+  document.querySelectorAll('[data-storage]').forEach(b=>b.classList.toggle('active',b===btn));
+  randomFive=null;
+  previousRandomKeys=new Set();
+  document.querySelectorAll('.row.open').forEach(r=>r.classList.remove('open'));
+  render();
+}));
 
 ['q','type','genre','rating','dur','sort'].forEach(id=>$(id).addEventListener(id==='q'?'input':'change',()=>{
   randomFive=null;
