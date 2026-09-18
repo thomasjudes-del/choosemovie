@@ -142,7 +142,7 @@ function row(x){
         <span class="year">${x.year?'('+x.year+')':''}</span>
         <span class="badge ${x.kind}">${kindLabel(x.kind)}</span>
         ${genres.length?`<span class="genres">${esc(genres.join(' / '))}</span>`:''}
-        <span class="rating-inline">${x.r?'★ '+x.r.toFixed(1):'★ —'}</span>
+        <span class="rating-inline">${x.r?'★ '+x.r.toFixed(1):'★ -'}</span>
         <span class="duration-inline">${fmtDur(x.d)||'—'}</span>
         ${actors.length?`<span class="actors">${esc(actors.join(', '))}</span>`:''}
         ${words.length?`<span class="keywords">${esc(words.join(' · '))}</span>`:''}
