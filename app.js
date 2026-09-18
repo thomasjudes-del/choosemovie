@@ -23,7 +23,7 @@ const DATA=(window.CHOOSE_DATA||[]).map(x=>{
 let onlyReady=false,seed=1;
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-function kindLabel(k){return k==='tv'?'SÉRIE':k==='collection'?'COLLECTION':'FILM'}
+function kindLabel(k){return k==='tv'?'SÉRIE':k==='collection'?'COLLECTION':k==='unknown'?'À IDENTIFIER':'FILM'}
 function fmtDur(m){if(!m)return'';let h=Math.floor(m/60),n=m%60;return h?(h+'h'+String(n).padStart(2,'0')):(m+' min')}
 function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function getGenres(){return [...new Set(DATA.flatMap(x=>x.g||[]))].sort((a,b)=>a.localeCompare(b,'fr'))}
