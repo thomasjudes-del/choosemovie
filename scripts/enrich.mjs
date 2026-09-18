@@ -8,6 +8,80 @@ for(const file of ['data-01.js','data-02.js','data-03.js','data-04.js']){
 }
 const source=ctx.window.CHOOSE_DATA||[];
 
+const ALIASES=new Map([
+  ["3 BODY PROBLEM",{q:"3 Body Problem",type:"series"}],
+  ["Butch Cassidy et le Kid",{q:"Butch Cassidy and the Sundance Kid"}],
+  ["C'Est Arrive Pres De Chez Vous Fr Par Subbass -dvdphoenix fr st",{q:"Man Bites Dog"}],
+  ["Chantons Sous La Pluie",{q:"Singin' in the Rain"}],
+  ["Dikkenek -OTHERS by SYR",{q:"Dikkenek"}],
+  ["Dragon Ball Z Doragon Bôru Z - Fukkatsu No 'F'",{q:"Dragon Ball Z: Resurrection 'F'"}],
+  ["DUNE PROPHECY",{q:"Dune: Prophecy",type:"series"}],
+  ["ENFERMES DEHORS",{q:"Enfermés dehors"}],
+  ["Fourmiz",{q:"Antz"}],
+  ["Indiana Jones Et La Derniere Croisade",{q:"Indiana Jones and the Last Crusade"}],
+  ["James Bond Operation Tonnerre",{q:"Thunderball"}],
+  ["Juste cause Sean connery",{q:"Just Cause"}],
+  ["Kill Bill Volume 1",{q:"Kill Bill: Vol. 1"}],
+  ["La Cite de dieu",{q:"City of God"}],
+  ["La Grande Belleza",{q:"The Great Beauty"}],
+  ["La Grande Bellezza",{q:"The Great Beauty"}],
+  ["La Mélodie Du Bonheur",{q:"The Sound of Music"}],
+  ["La Tour Infernale John Guillermin Steve Mcqueen Paul Newman William Holden Faye Dunaway",{q:"The Towering Inferno"}],
+  ["La Tour Montparnasse Infernale francais DivX",{q:"La Tour Montparnasse infernale"}],
+  ["Lawrence d'Arabie - Fr - Complet - de David Lean avec Peter O'Toole, Anthony Quinn, Omar Sharif",{q:"Lawrence of Arabia"}],
+  ["Le 13eme Guerrier DivX-Notag",{q:"The 13th Warrior"}],
+  ["Le Bon La Brute et le Truand Version",{q:"The Good, the Bad and the Ugly"}],
+  ["Le Cauchemar De Darwin VOST",{q:"Darwin's Nightmare"}],
+  ["Le Cercle Des Poetes Disparus",{q:"Dead Poets Society"}],
+  ["Le Clan Des Siciliens",{q:"The Sicilian Clan"}],
+  ["Le Gout Des Autres (Agnes Jaoui, Jpierre Bacri, Alain Chabat, Gerard Lanvin)",{q:"The Taste of Others"}],
+  ["Le Mur de l'Atlantique",{q:"The Atlantic Wall"}],
+  ["Le Nom De La Rose",{q:"The Name of the Rose"}],
+  ["LE PLUS BEAU DES COMBATS",{q:"Remember the Titans"}],
+  ["Le Premier Jour Du Reste De Ta Vie -GKS",{q:"The First Day of the Rest of Your Life"}],
+  ["Le Roi Lion",{q:"The Lion King"}],
+  ["Le Voyage Du Ballon Rouge",{q:"Flight of the Red Balloon"}],
+  ["Les 55 Jours de Pekin",{q:"55 Days at Peking"}],
+  ["Les Fantomes De Goya Goyas Ghosts",{q:"Goya's Ghosts"}],
+  ["Les rivieres pourpres",{q:"The Crimson Rivers"}],
+  ["Les Seigneurs de la Guerre",{q:"The Warlords"}],
+  ["Les Sept Mercenaires",{q:"The Magnificent Seven"}],
+  ["Les Tontons Flingueurs (Benard Blier, Lino Ventura)",{q:"Crooks in Clover"}],
+  ["Les Traducteurs",{q:"The Translators"}],
+  ["Louis De Funès - Faites sauter la banque",{q:"Faites sauter la banque"}],
+  ["Louis De Funes - La Folies Des Grandeurs",{q:"Delusions of Grandeur"}],
+  ["Louis De Funès - Le Gentleman D'Epsom",{q:"The Gentleman from Epsom"}],
+  ["louis de funes Le Petit Baigneur Fr -Dvd Rip Par Mikemarie(Excellent) testé",{q:"The Little Bather"}],
+  ["Louis De Funes - Pouic Pouic Fr",{q:"Pouic-Pouic"}],
+  ["Louis Funes - La Grande Vadrouille",{q:"La Grande Vadrouille"}],
+  ["Louis Funes - La soupe aux choux",{q:"The Cabbage Soup"}],
+  ["Louis Funes - LE CORNIAUD",{q:"The Sucker"}],
+  ["Louis Funes - Le grand restaurant",{q:"The Restaurant"}],
+  ["Louis Funes - Oscar",{q:"Oscar"}],
+  ["Louis Funes - Rabbi Jacob",{q:"The Mad Adventures of Rabbi Jacob"}],
+  ["Mackennas Gold",{q:"Mackenna's Gold"}],
+  ["Mélodie En Sous-Sol - Henri Verneuil - Michel Audiard - Jean Gabin - Alain Delon",{q:"Any Number Can Win"}],
+  ["Mépris, Le",{q:"Contempt"}],
+  ["Miguel Gomes - Tabu",{q:"Tabu"}],
+  ["Mononoke hime - Princess Mononoke",{q:"Princess Mononoke"}],
+  ["O Som Ao Redor",{q:"Neighboring Sounds"}],
+  ["Papi Fait De La Resistance",{q:"Papy fait de la résistance"}],
+  ["Preditors",{q:"Predators"}],
+  ["Proposition Indécente",{q:"Indecent Proposal"}],
+  ["Season of the Witch",{q:"Season of the Witch",type:"movie"}],
+  ["The Queens Gambit",{q:"The Queen's Gambit",type:"series"}],
+  ["To Gerard",{q:"To: Gerard"}],
+  ["Touchez pas au grisbi",{q:"Touchez pas au grisbi"}],
+  ["Transformers 3 - Dark of the Moon",{q:"Transformers: Dark of the Moon"}],
+  ["Willy 1er",{q:"Willy 1er"}],
+  ["Wonderful Days",{q:"Wonderful Days"}],
+  ["Zidane A 21st Century Portrait",{q:"Zidane: A 21st Century Portrait"}]
+]);
+const COLLECTION_NAMES=new Set([
+  "CHRISTOPHER NOLAN dont Batman","DA et ANIMATION","DBZ","DBZ Kai et movies","FILMS EN ARABE ou recents"
+]);
+
+
 function cleanTitle(s=''){
   return s
     .replace(/https?:\/\/\S+/gi,' ')
@@ -36,8 +110,8 @@ function sim(a,b){
   const union=new Set([...A,...B]).size||1;
   return (inter/union)*75;
 }
-function scoreCandidate(item,c){
-  const base=sim(cleanTitle(item.t),c.name||'');
+function scoreCandidate(item,c,query){
+  const base=sim(query||cleanTitle(item.t),c.name||'');
   let s=base;
   const iy=item.y||null, cy=yearOf(c);
   if(iy&&cy){
@@ -82,16 +156,22 @@ async function detail(type,id){
   return j.meta||null;
 }
 async function enrichOne(item,index){
-  if(item.k==='collection')return {...item,e:item.e||0};
-  const q=cleanTitle(item.t);
+  if(item.e && item.p && item.s && item.r)return item;
+  if(COLLECTION_NAMES.has(item.t))return {...item,k:'collection',e:1};
+  if(item.k==='collection')return {...item,e:1};
+  const alias=ALIASES.get(item.t);
+  const q=alias?.q||cleanTitle(item.t);
   if(q.length<2)return {...item,e:item.e||0};
-  const preferred=item.k==='tv'?'series':'movie';
+  const preferred=alias?.type||(item.k==='tv'?'series':'movie');
   let candidates=[];
   try{candidates=await search(preferred,q)}catch{}
-  if(!candidates.length){
-    try{candidates=await search(preferred==='movie'?'series':'movie',q)}catch{}
+  let ranked=candidates.map(c=>({c,s:scoreCandidate(item,c,q)})).sort((a,b)=>b.s-a.s);
+  if(!ranked.length || ranked[0].s<68){
+    try{
+      const alt=await search(preferred==='movie'?'series':'movie',q);
+      ranked=ranked.concat(alt.map(c=>({c,s:scoreCandidate(item,c,q)}))).sort((a,b)=>b.s-a.s);
+    }catch{}
   }
-  const ranked=candidates.map(c=>({c,s:scoreCandidate(item,c)})).sort((a,b)=>b.s-a.s);
   const best=ranked[0];
   if(!best||best.s<68)return {...item,e:item.e||0};
   let meta=best.c;
