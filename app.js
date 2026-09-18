@@ -278,7 +278,7 @@ function locationHtml(x){
         <code title="${esc(l.p)}">${esc(l.p)}</code>
       </div>
       <div class="location-actions">
-        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Ouvrir cet emplacement dans l’Explorateur Windows">📁 Explorer</a>
+        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Ouvrir cet emplacement dans l’Explorateur Windows">📁 Ouvrir dans Explorer</a>
         <button class="mini-btn copy-path" type="button" data-path="${esc(l.p)}">Copier</button>
       </div>
     </div>`;
