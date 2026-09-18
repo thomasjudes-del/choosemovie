@@ -1,11 +1,16 @@
-name: Enrich ChooseMovie catalog
+name: Enrich movie catalogue
 
 on:
-  workflow_dispatch:
   push:
+    branches: [main]
     paths:
-      - "scripts/enrich.mjs"
-      - ".github/workflows/enrich.yml"
+      - 'scripts/enrich_imdb.py'
+      - '.github/workflows/enrich.yml'
+      - 'data-01.js'
+      - 'data-02.js'
+      - 'data-03.js'
+      - 'data-04.js'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,21 +21,18 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-      - name: Enrich catalog from Cinemeta
-        run: node scripts/enrich.mjs
-      - name: Commit enriched catalog
+      - name: Enrich from IMDb public pages
+        env:
+          WORKERS: '5'
+        run: python scripts/enrich_imdb.py
+      - name: Commit enriched catalogue
         run: |
-          git config user.name "ChooseMovie Bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add data-01.js data-02.js data-03.js data-04.js unmatched.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data-enriched.js
           if git diff --cached --quiet; then
-            echo "No catalog changes"
-            exit 0
+            echo "No catalogue changes"
+          else
+            git commit -m "Enrich full movie catalogue"
+            git push
           fi
-          git commit -m "Enrich full ChooseMovie catalog"
-          git push
