@@ -34,3 +34,5 @@ main{max-width:1280px;margin:0 auto;padding:28px}
 code{background:var(--surface-2);padding:2px 5px;border-radius:5px}
 @media(max-width:900px){.toolbar{grid-template-columns:1fr}.filters{justify-content:flex-start}.row-right{min-width:auto}.runtime{display:none}}
 @media(max-width:640px){.topbar{padding:14px 16px}.tagline{display:none}.top-actions{gap:5px}.top-actions button{padding:9px 10px;font-size:12px}main{padding:16px}.row-main{grid-template-columns:36px minmax(0,1fr) auto}.poster-mini-wrap{width:36px;height:48px}.row-right{grid-template-columns:auto 20px}.row-kind{display:none}.detail-grid{grid-template-columns:1fr}.detail-poster{width:110px}.filters select{height:42px;max-width:47%}.onboarding-card{padding:28px}.onboarding h1{font-size:30px}}
+
+.tmdb-credit{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.35}.tmdb-credit img{width:34px;height:34px;object-fit:contain;flex:0 0 auto}
