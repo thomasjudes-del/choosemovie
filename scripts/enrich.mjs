@@ -8,7 +8,6 @@ for(const file of ['data-01.js','data-02.js','data-03.js','data-04.js']){
 }
 const source=ctx.window.CHOOSE_DATA||[];
 
-const STOP=new Set(('the a an and or of to in on for from with by at as is are was were be been being this that these those his her their its into about after before during over under through between against without within not no one two new old man woman men women life lives story world time years year young finds find must while when where who what how why film movie series former becomes become tries try discover discovers discovers family home own only also more most much many then than them they she he it we you i our your but if all some any each every both another very just still ever never can could would should will may might have has had do does did'.split(/\s+/));
 function cleanTitle(s=''){
   return s
     .replace(/https?:\/\/\S+/gi,' ')
