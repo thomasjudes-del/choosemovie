@@ -59,6 +59,21 @@ function dedupeCatalog(items){
 }
 const DATA=dedupeCatalog(RAW_DATA);
 
+const ACTOR_COUNTS=new Map();
+for(const item of DATA){
+  for(const actor of (item.a||[])){
+    if(!actor) continue;
+    ACTOR_COUNTS.set(actor,(ACTOR_COUNTS.get(actor)||0)+1);
+  }
+}
+
+function actorHtml(name){
+  const count=ACTOR_COUNTS.get(name)||0;
+  return count>1
+    ? `<button class="actor-link" type="button" data-actor="${esc(name)}" title="Voir les ${count} titres avec ${esc(name)}">${esc(name)}</button>`
+    : `<span class="actor-name">${esc(name)}</span>`;
+}
+
 let seed=1;
 let randomFive=null;
 let previousRandomKeys=new Set();
@@ -309,15 +324,15 @@ function locationHtml(x){
         root=root.replace(/\\[^\\]+$/,'');
       }
     }
-    const directUrl='choosemovie://open?path='+encodeURIComponent(l.p);
+    const explorerUrl='search-ms:query='+encodeURIComponent(raw||displayTitle(x))+'&crumb=location:'+encodeURIComponent(root);
     return `<div class="location-row">
       <div class="location-text">
         <strong class="drive-tag drive-${locDrive(l).toLowerCase()}">${locDrive(l)}:</strong>
         <strong>${esc(l.s||'Source')}</strong>
-        <code title="${esc(l.p)}">${esc(l.p)}</code>
+        <a class="path-link open-local" href="${esc(explorerUrl)}" title="Rechercher cet emplacement dans l’Explorateur Windows">${esc(l.p)}</a>
       </div>
       <div class="location-actions">
-        <a class="mini-btn open-local" href="${esc(directUrl)}" title="Ouvrir directement cet emplacement dans l’Explorateur Windows">📁 Ouvrir</a>
+        <a class="mini-btn open-local" href="${esc(explorerUrl)}" title="Trouver cet emplacement dans l’Explorateur Windows">🔎 Trouver dans l’explorateur</a>
         <button class="mini-btn copy-path" type="button" data-path="${esc(l.p)}">Copier</button>
       </div>
     </div>`;
@@ -374,14 +389,11 @@ function row(x){
 
           <div class="detail-facts">
             ${x.director?`<div><strong>Réalisation</strong><span>${esc(x.director)}</span></div>`:''}
-            ${(x.a||[]).length?`<div><strong>Distribution</strong><span>${esc(x.a.join(', '))}</span></div>`:''}
+            ${(x.a||[]).length?`<div><strong>Distribution</strong><span class="cast-list">${x.a.map(actorHtml).join('<span class="cast-sep">, </span>')}</span></div>`:''}
           </div>
 
           <div class="locations">
-            <div class="location-heading">
-              <div class="section-label">Emplacement dans ta bibliothèque</div>
-              <a class="helper-link" href="install-choosemovie.cmd" download>⚙ Activer l’ouverture directe (1×)</a>
-            </div>
+            <div class="section-label">Emplacement dans ta bibliothèque</div>
             ${locationHtml(x)}
           </div>
         </div>
@@ -391,6 +403,18 @@ function row(x){
 }
 
 document.addEventListener('click',async e=>{
+  const actor=e.target.closest('[data-actor]');
+  if(actor){
+    e.stopPropagation();
+    $('q').value=actor.dataset.actor||'';
+    randomFive=null;
+    previousRandomKeys=new Set();
+    document.querySelectorAll('.row.open').forEach(r=>r.classList.remove('open'));
+    render();
+    window.scrollTo({top:0,behavior:'smooth'});
+    return;
+  }
+
   const btn=e.target.closest('.copy-path');
   if(!btn)return;
   e.stopPropagation();
