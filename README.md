@@ -1,26 +1,47 @@
 # ChooseMovie
 
-Mini videotheque personnelle statique : import d'un export AI Context Basket, lecture compacte, filtres, fiches depliables et enrichissement TMDB.
+Mini vidéothèque personnelle statique pour choisir rapidement quoi regarder à partir d'un export AI Context Basket.
 
 ## V0
 
-- importe un fichier .txt AI Context Basket contenant des lignes [DIR] / [FILE]
-- nettoie les noms de releases et deduplique les copies evidentes
-- distingue film, serie et collection apres enrichissement
-- affiche annee, genre, note TMDB, duree, acteurs principaux et mots-cles
-- clic sur une ligne : poster, synopsis, realisation/creation, casting et details
-- filtres type, genre, note, duree, tri et recherche plein texte
-- bouton Au hasard
-- donnees personnelles stockees uniquement dans le navigateur
+- import d'un fichier .txt contenant des lignes [DIR] / [FILE]
+- nettoyage des noms de releases et dédoublonnage des copies évidentes
+- regroupement des épisodes SxxExx et des saisons sous une seule série
+- distinction film, série, collection et titre non identifié
+- ligne compacte : titre, année, type, genres, acteurs, mots-clés, note TMDB, durée
+- clic sur une ligne : poster, synopsis, réalisation/création, casting et emplacement d'origine
+- recherche plein texte et filtres type, genre, note, durée
+- tris titre, note, année ou mélange aléatoire
+- export du catalogue enrichi en JSON
+- reprise automatique de l'enrichissement si on l'arrête
 
-## Confidentialite
+## Démarrage
 
-Le repo ne contient volontairement aucune bibliotheque personnelle. Le depot est public : l'import reste cote navigateur et les chemins locaux ne sont pas publies.
+Le repo ne contient volontairement aucune bibliothèque personnelle. Le dépôt est public et l'import reste côté navigateur.
 
-## TMDB
+1. Ouvrir l'app.
+2. Cliquer sur Importer et choisir l'export .txt généré par AI Context Basket.
+3. Dans TMDB, créer ou récupérer un API Read Access Token.
+4. Dans ChooseMovie, cliquer TMDB, coller le token, enregistrer puis Enrichir les titres.
 
-Dans l'app, renseigner un API Read Access Token TMDB. Le token reste dans le stockage local du navigateur et n'est jamais commite. La note affichee est la moyenne utilisateurs TMDB.
+Le token et le catalogue restent dans le localStorage du navigateur et ne sont jamais commités.
+
+## Hébergement
+
+L'app est 100 % statique. Elle peut être publiée directement avec GitHub Pages depuis la branche main, dossier racine /.
+
+Pour tester localement :
+
+```bash
+python -m http.server 8080
+```
+
+Puis ouvrir http://localhost:8080.
+
+## Données TMDB
+
+ChooseMovie utilise TMDB pour la recherche, les détails, crédits, mots-clés et posters. La note affichée est la moyenne utilisateurs TMDB. Pour une série, la durée affichée correspond à la durée habituelle d'un épisode lorsqu'elle est disponible.
 
 ## Limite connue
 
-Un export qui ne liste que le premier niveau d'un dossier ne peut pas connaitre les films caches dans un dossier-collection comme JAMES BOND ou STAR WARS. ChooseMovie marque donc ces entrees comme collections au lieu d'inventer leur contenu.
+L'export actuel ne descend pas forcément dans les sous-dossiers. Si un dossier comme JAMES BOND ou STAR WARS ne contient pas la liste de ses films dans l'export, ChooseMovie ne peut pas les inventer et conserve l'entrée comme collection ou titre à vérifier.
