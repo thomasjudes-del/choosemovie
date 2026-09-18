@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Classes\choosemovie]
+@="URL:ChooseMovie Protocol"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\choosemovie\shell\open\command]
+@="cmd.exe /d /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%LOCALAPPDATA%\\ChooseMovie\\choosemovie-open.ps1\" \"%1\""
