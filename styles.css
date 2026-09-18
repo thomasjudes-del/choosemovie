@@ -151,3 +151,7 @@ select{height:42px;border:1px solid #d8dce2;border-radius:10px;background:#fff;c
 .drive-c{background:#e7f2ff;color:#1c5f9d!important}
 .drive-e{background:#fff0d7;color:#925d0a!important}
 .pill.warning{background:rgba(255,199,91,.16);border-color:rgba(255,199,91,.22);color:#f3d49a}
+
+.location-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:2px}
+.helper-link{font-size:10px;font-weight:800;color:#5c6570;text-decoration:none;border-bottom:1px dotted #a7adb4}
+.helper-link:hover{color:#1d5f9c;border-color:#1d5f9c}
