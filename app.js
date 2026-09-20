@@ -79,7 +79,8 @@ let randomFive=null;
 let previousRandomKeys=new Set();
 let storageMode='C';
 const $=id=>document.getElementById(id);
-const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()\n  .replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+  .replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 
 const GENRE_FR={
   'Action':'Action','Adventure':'Aventure','Animation':'Animation','Biography':'Biopic',
@@ -350,7 +351,10 @@ function render(){
     const rowEl=el.closest('.row');
     const opening=!rowEl.classList.contains('open');
     document.querySelectorAll('.row.open').forEach(r=>r.classList.remove('open'));
-    if(opening){\n      rowEl.classList.add('open');\n      hydrateSynopsis(rowEl);\n    }
+    if(opening){
+      rowEl.classList.add('open');
+      hydrateSynopsis(rowEl);
+    }
   });
 }
 
