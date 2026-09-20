@@ -1,6 +1,6 @@
 const RAW_DATA=(window.CHOOSE_DATA||[]).map(x=>({
   title:x.t,year:x.y||null,kind:x.k||'movie',copies:x.c||1,enriched:!!x.e,
-  r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',q:x.q||'',
+  r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',q:x.q||'',long:x.l||'',
   poster:x.p||'',director:x.dir||'',imdb:x.id||'',loc:x.loc||[],orig:x.orig||x.t,
   key:((x.t||'')+'|'+(x.y||''))
 }));
@@ -227,46 +227,108 @@ function firstCompleteSentence(s=''){
   return clean;
 }
 
-function microPitch(x){
-  let custom=(x.q||'').replace(/\s+/g,' ').trim();
-  if(custom){
-    return /[.!?]$/.test(custom) ? custom : custom+'.';
+function compactSentence(s=''){
+  let t=(s||'').replace(/\s+/g,' ').trim();
+  if(!t) return '';
+  t=firstCompleteSentence(t);
+
+  // Remove a long introductory clause when the useful subject comes after the first comma.
+  if(t.length>92 && /^(when|while|after|before|as|in|during|following)\b/i.test(t)){
+    const comma=t.indexOf(',');
+    if(comma>12 && comma<t.length-24){
+      let rest=t.slice(comma+1).trim();
+      if(rest){
+        rest=rest.charAt(0).toUpperCase()+rest.slice(1);
+        if(!/[.!?]$/.test(rest)) rest+='.';
+        t=rest;
+      }
+    }
   }
+
+  if(t.length<=112) return t;
+  const cut=t.slice(0,108);
+  const stop=Math.max(cut.lastIndexOf(' '),78);
+  return cut.slice(0,stop).replace(/[,:;\s]+$/,'')+'…';
+}
+
+function microPitch(x){
+  const custom=(x.q||'').replace(/\s+/g,' ').trim();
+  if(custom) return compactSentence(custom);
   const t=(x.s||'').replace(/\s+/g,' ').trim();
   if(!t) return x.kind==='collection' ? 'Collection à explorer.' : '';
-  let sentence=firstCompleteSentence(t);
-  if(!sentence) return '';
-  if(!/[.!?]$/.test(sentence)) sentence=sentence.replace(/[,:;\s]+$/,'')+'.';
-  return sentence;
+  return compactSentence(t);
 }
 
 function localDetailSynopsis(x){
-  const t=(x.s||'').replace(/\s+/g,' ').trim();
-  if(!t) return 'Pas de synopsis fiable disponible pour ce titre.';
-  if(!likelyTruncatedSynopsis(t)) return t;
-  const clean=t.replace(/(?:\.{3}|…)\s*$/,'').trim();
+  const preferred=(x.long||x.s||'').replace(/\s+/g,' ').trim();
+  if(!preferred) return 'Pas de synopsis fiable disponible pour ce titre.';
+  if(!likelyTruncatedSynopsis(preferred)) return preferred;
+  const clean=preferred.replace(/(?:\.{3}|…)\s*$/,'').trim();
   const complete=[...clean.matchAll(/.*?[.!?](?=\s|$)/g)].map(m=>m[0].trim()).filter(Boolean);
   if(complete.length) return complete.join(' ');
   return clean ? clean.replace(/[,:;\s]+$/,'')+'.' : 'Pas de synopsis fiable disponible pour ce titre.';
 }
 
+function usefulDetailedText(text,current=''){
+  const t=(text||'').replace(/\s+/g,' ').trim();
+  if(!t || likelyTruncatedSynopsis(t)) return '';
+  if(t.length<Math.max(180,current.length+55)) return '';
+  return t;
+}
+
+async function fetchWikipediaSynopsis(title,year,kind){
+  if(!title) return '';
+  const suffix=kind==='tv'?' television series':' film';
+  const query='"'+title+'" '+(year||'')+suffix+'"';
+  const url='https://en.wikipedia.org/w/api.php?origin=*&format=json&action=query&generator=search'
+    +'&gsrsearch='+encodeURIComponent(query)
+    +'&gsrlimit=3&gsrnamespace=0&prop=extracts&exintro=1&explaintext=1&exsentences=5';
+  const res=await fetch(url,{cache:'force-cache'});
+  if(!res.ok) return '';
+  const body=await res.json();
+  const pages=Object.values(body?.query?.pages||{});
+  if(!pages.length) return '';
+  const target=norm(title);
+  pages.sort((a,b)=>{
+    const aTitle=norm(a.title||''), bTitle=norm(b.title||'');
+    const aScore=(aTitle.includes(target)?3:0)+((a.extract||'').length/1000);
+    const bScore=(bTitle.includes(target)?3:0)+((b.extract||'').length/1000);
+    return bScore-aScore;
+  });
+  return (pages[0]?.extract||'').replace(/\s+/g,' ').trim();
+}
+
 async function hydrateSynopsis(rowEl){
-  const syn=rowEl.querySelector('.syn[data-truncated="1"][data-imdb]');
+  const syn=rowEl.querySelector('.syn[data-imdb]');
   if(!syn || syn.dataset.loading==='1' || syn.dataset.hydrated==='1') return;
   const imdb=syn.dataset.imdb||'';
-  if(!imdb) return;
+  const title=syn.dataset.title||'';
+  const year=syn.dataset.year||'';
+  const kind=syn.dataset.kind||'movie';
   syn.dataset.loading='1';
+
+  let current=syn.textContent.trim();
+  let best=current;
+
   try{
-    const type=syn.dataset.kind==='tv'?'series':'movie';
-    const res=await fetch('https://v3-cinemeta.strem.io/meta/'+type+'/'+encodeURIComponent(imdb)+'.json',{cache:'force-cache'});
-    if(!res.ok) return;
-    const body=await res.json();
-    const full=(body?.meta?.description||'').replace(/\s+/g,' ').trim();
-    if(full && !likelyTruncatedSynopsis(full) && full.length>syn.textContent.trim().length){
-      syn.textContent=full;
-      syn.dataset.hydrated='1';
+    if(imdb){
+      const type=kind==='tv'?'series':'movie';
+      const res=await fetch('https://v3-cinemeta.strem.io/meta/'+type+'/'+encodeURIComponent(imdb)+'.json',{cache:'force-cache'});
+      if(res.ok){
+        const body=await res.json();
+        const candidate=usefulDetailedText(body?.meta?.description||'',best);
+        if(candidate) best=candidate;
+      }
     }
+
+    const wiki=await fetchWikipediaSynopsis(title,year,kind);
+    const wikiCandidate=usefulDetailedText(wiki,best);
+    if(wikiCandidate) best=wikiCandidate;
+
+    if(best!==current) syn.textContent=best;
+    syn.dataset.hydrated='1';
   }catch(_err){
+    // Keep the local synopsis if online enrichment is unavailable.
   }finally{
     delete syn.dataset.loading;
   }
@@ -435,7 +497,7 @@ function row(x){
 
           <div class="synopsis-block">
             <div class="section-label">Synopsis</div>
-            <p class="syn" data-imdb="${esc(x.imdb)}" data-kind="${esc(x.kind)}" data-truncated="${likelyTruncatedSynopsis(x.s)?'1':'0'}">${esc(localDetailSynopsis(x))}</p>
+            <p class="syn" data-imdb="${esc(x.imdb)}" data-title="${esc(x.title)}" data-year="${esc(x.year||'')}" data-kind="${esc(x.kind)}">${esc(localDetailSynopsis(x))}</p>
           </div>
 
           <div class="detail-facts">
