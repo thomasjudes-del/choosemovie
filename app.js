@@ -1,6 +1,6 @@
 const RAW_DATA=(window.CHOOSE_DATA||[]).map(x=>({
   title:x.t,year:x.y||null,kind:x.k||'movie',copies:x.c||1,enriched:!!x.e,
-  r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',
+  r:x.r??null,d:x.d??null,g:x.g||[],a:x.a||[],k:x.w||[],s:x.s||'',q:x.q||'',
   poster:x.p||'',director:x.dir||'',imdb:x.id||'',loc:x.loc||[],orig:x.orig||x.t,
   key:((x.t||'')+'|'+(x.y||''))
 }));
@@ -79,7 +79,7 @@ let randomFive=null;
 let previousRandomKeys=new Set();
 let storageMode='C';
 const $=id=>document.getElementById(id);
-const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()\n  .replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 
 const GENRE_FR={
   'Action':'Action','Adventure':'Aventure','Animation':'Animation','Biography':'Biopic',
@@ -213,16 +213,63 @@ function microKeywords(x){
   return out.slice(0,5);
 }
 
-function microPitch(x){
-  let t=(x.s||'').replace(/\s+/g,' ').trim();
-  if(!t) return x.kind==='collection' ? 'Collection à explorer' : '';
-  const max=145;
-  if(t.length<=max) return t;
-  const cut=t.slice(0,max);
-  const safe=cut.slice(0,Math.max(cut.lastIndexOf(' '),105));
-  return safe.replace(/[,:;\s]+$/,'')+'…';
+function likelyTruncatedSynopsis(s=''){
+  return /(?:\.{3}|…)\s*$/.test((s||'').trim());
 }
 
+function firstCompleteSentence(s=''){
+  const t=(s||'').replace(/\s+/g,' ').trim();
+  if(!t) return '';
+  const clean=t.replace(/(?:\.{3}|…)\s*$/,'').trim();
+  const match=clean.match(/^.*?[.!?](?=\s|$)/);
+  if(match) return match[0].trim();
+  return clean;
+}
+
+function microPitch(x){
+  let custom=(x.q||'').replace(/\s+/g,' ').trim();
+  if(custom){
+    return /[.!?]$/.test(custom) ? custom : custom+'.';
+  }
+  const t=(x.s||'').replace(/\s+/g,' ').trim();
+  if(!t) return x.kind==='collection' ? 'Collection à explorer.' : '';
+  let sentence=firstCompleteSentence(t);
+  if(!sentence) return '';
+  if(!/[.!?]$/.test(sentence)) sentence=sentence.replace(/[,:;\s]+$/,'')+'.';
+  return sentence;
+}
+
+function localDetailSynopsis(x){
+  const t=(x.s||'').replace(/\s+/g,' ').trim();
+  if(!t) return 'Pas de synopsis fiable disponible pour ce titre.';
+  if(!likelyTruncatedSynopsis(t)) return t;
+  const clean=t.replace(/(?:\.{3}|…)\s*$/,'').trim();
+  const complete=[...clean.matchAll(/.*?[.!?](?=\s|$)/g)].map(m=>m[0].trim()).filter(Boolean);
+  if(complete.length) return complete.join(' ');
+  return clean ? clean.replace(/[,:;\s]+$/,'')+'.' : 'Pas de synopsis fiable disponible pour ce titre.';
+}
+
+async function hydrateSynopsis(rowEl){
+  const syn=rowEl.querySelector('.syn[data-truncated="1"][data-imdb]');
+  if(!syn || syn.dataset.loading==='1' || syn.dataset.hydrated==='1') return;
+  const imdb=syn.dataset.imdb||'';
+  if(!imdb) return;
+  syn.dataset.loading='1';
+  try{
+    const type=syn.dataset.kind==='tv'?'series':'movie';
+    const res=await fetch('https://v3-cinemeta.strem.io/meta/'+type+'/'+encodeURIComponent(imdb)+'.json',{cache:'force-cache'});
+    if(!res.ok) return;
+    const body=await res.json();
+    const full=(body?.meta?.description||'').replace(/\s+/g,' ').trim();
+    if(full && !likelyTruncatedSynopsis(full) && full.length>syn.textContent.trim().length){
+      syn.textContent=full;
+      syn.dataset.hydrated='1';
+    }
+  }catch(_err){
+  }finally{
+    delete syn.dataset.loading;
+  }
+}
 function posterUrl(x){
   if(x.imdb) return 'https://images.metahub.space/poster/medium/'+encodeURIComponent(x.imdb)+'/img';
   return x.poster||'';
@@ -303,7 +350,7 @@ function render(){
     const rowEl=el.closest('.row');
     const opening=!rowEl.classList.contains('open');
     document.querySelectorAll('.row.open').forEach(r=>r.classList.remove('open'));
-    if(opening) rowEl.classList.add('open');
+    if(opening){\n      rowEl.classList.add('open');\n      hydrateSynopsis(rowEl);\n    }
   });
 }
 
@@ -384,7 +431,7 @@ function row(x){
 
           <div class="synopsis-block">
             <div class="section-label">Synopsis</div>
-            <p class="syn">${esc(x.s||'Pas de synopsis fiable disponible pour ce titre.')}</p>
+            <p class="syn" data-imdb="${esc(x.imdb)}" data-kind="${esc(x.kind)}" data-truncated="${likelyTruncatedSynopsis(x.s)?'1':'0'}">${esc(localDetailSynopsis(x))}</p>
           </div>
 
           <div class="detail-facts">
