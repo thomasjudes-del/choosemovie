@@ -119,6 +119,7 @@ select{height:42px;border:1px solid #d8dce2;border-radius:10px;background:#fff;c
 .section-label{text-transform:uppercase;letter-spacing:.09em;font-size:9px;font-weight:900;color:#888d94;margin-bottom:6px}
 .synopsis-block{max-width:980px}
 .syn{font-size:15px;line-height:1.62;color:#2e3135;margin:0 0 17px}
+.syn-lead{font-weight:800;color:#202327}
 .detail-facts{display:grid;grid-template-columns:minmax(160px,.55fr) minmax(300px,1.45fr);gap:12px 22px;margin:12px 0 18px;max-width:1100px}
 .detail-facts>div{display:grid;gap:3px}.detail-facts strong{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#8a8e94}.detail-facts span{font-size:13px;line-height:1.45;color:#282b2f}
 .locations{border-top:1px solid #dedfdf;padding-top:14px;max-width:1100px}
