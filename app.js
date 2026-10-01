@@ -269,66 +269,163 @@ function localDetailSynopsis(x){
   return clean ? clean.replace(/[,:;\s]+$/,'')+'.' : 'Pas de synopsis fiable disponible pour ce titre.';
 }
 
-function usefulDetailedText(text,current=''){
+function sentenceParts(text=''){
   const t=(text||'').replace(/\s+/g,' ').trim();
-  if(!t || likelyTruncatedSynopsis(t)) return '';
-  if(t.length<Math.max(180,current.length+55)) return '';
-  return t;
+  if(!t) return [];
+  const matches=t.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) || [];
+  return matches.map(s=>s.trim()).filter(Boolean);
 }
 
-async function fetchWikipediaSynopsis(title,year,kind){
+function storyExcerpt(text,maxSentences=4,maxChars=680){
+  const parts=sentenceParts(text);
+  if(!parts.length) return '';
+  const out=[];
+  let chars=0;
+  for(const part of parts){
+    if(out.length>=maxSentences) break;
+    if(out.length>=2 && chars+part.length>maxChars) break;
+    out.push(part);
+    chars+=part.length+1;
+  }
+  return out.join(' ').trim();
+}
+
+function renderSynopsisContent(el,text){
+  const parts=sentenceParts(text);
+  el.replaceChildren();
+  if(parts.length>1){
+    const lead=document.createElement('strong');
+    lead.className='syn-lead';
+    lead.textContent=parts[0];
+    el.appendChild(lead);
+    el.appendChild(document.createTextNode(' '+parts.slice(1).join(' ')));
+  }else{
+    el.textContent=(text||'').trim();
+  }
+}
+
+function stripWikiHtml(html=''){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  doc.querySelectorAll('sup,table,style,script,.mw-editsection,.navbox,.infobox').forEach(n=>n.remove());
+  return (doc.body.textContent||'')
+    .replace(/\[[^\]]{1,24}\]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function wikiSectionScore(line=''){
+  const n=norm(line);
+  if(n==='plot') return 100;
+  if(n==='synopsis') return 95;
+  if(n==='premise') return 90;
+  if(n==='story') return 85;
+  if(n.startsWith('plot ')) return 80;
+  return 0;
+}
+
+async function fetchWikipediaPlot(title,year,director,kind){
   if(!title) return '';
-  const suffix=kind==='tv'?' television series':' film';
-  const query='"'+title+'" '+(year||'')+suffix+'"';
-  const url='https://en.wikipedia.org/w/api.php?origin=*&format=json&action=query&generator=search'
-    +'&gsrsearch='+encodeURIComponent(query)
-    +'&gsrlimit=3&gsrnamespace=0&prop=extracts&exintro=1&explaintext=1&exsentences=5';
-  const res=await fetch(url,{cache:'force-cache'});
-  if(!res.ok) return '';
-  const body=await res.json();
-  const pages=Object.values(body?.query?.pages||{});
-  if(!pages.length) return '';
-  const target=norm(title);
-  pages.sort((a,b)=>{
-    const aTitle=norm(a.title||''), bTitle=norm(b.title||'');
-    const aScore=(aTitle.includes(target)?3:0)+((a.extract||'').length/1000);
-    const bScore=(bTitle.includes(target)?3:0)+((b.extract||'').length/1000);
-    return bScore-aScore;
+
+  const directorName=(director||'').split(',')[0].trim();
+  const query=[
+    '"'+title+'"',
+    year||'',
+    directorName ? '"'+directorName+'"' : '',
+    kind==='tv' ? 'television series' : 'film'
+  ].filter(Boolean).join(' ');
+
+  const searchUrl='https://en.wikipedia.org/w/api.php?origin=*&format=json&action=query&list=search'
+    +'&srsearch='+encodeURIComponent(query)
+    +'&srlimit=5&srnamespace=0';
+
+  const searchRes=await fetch(searchUrl,{cache:'force-cache'});
+  if(!searchRes.ok) return '';
+  const searchBody=await searchRes.json();
+  const results=searchBody?.query?.search||[];
+  if(!results.length) return '';
+
+  const targetTitle=norm(title);
+  const directorSurname=norm(directorName.split(/\s+/).pop()||'');
+  results.sort((a,b)=>{
+    const score=r=>{
+      const page=norm(r.title||'');
+      const snippet=norm((r.snippet||'').replace(/<[^>]+>/g,' '));
+      let s=0;
+      if(page===targetTitle) s+=8;
+      if(page.includes(targetTitle)) s+=6;
+      if(year && (page.includes(String(year))||snippet.includes(String(year)))) s+=4;
+      if(directorSurname && (page.includes(directorSurname)||snippet.includes(directorSurname))) s+=6;
+      if(kind==='tv' ? /series|television/.test(page) : /film/.test(page)) s+=2;
+      return s;
+    };
+    return score(b)-score(a);
   });
-  return (pages[0]?.extract||'').replace(/\s+/g,' ').trim();
+
+  for(const result of results){
+    const pageid=result.pageid;
+    if(!pageid) continue;
+
+    const sectionsUrl='https://en.wikipedia.org/w/api.php?origin=*&format=json&action=parse'
+      +'&pageid='+encodeURIComponent(pageid)
+      +'&prop=sections';
+    const sectionsRes=await fetch(sectionsUrl,{cache:'force-cache'});
+    if(!sectionsRes.ok) continue;
+    const sectionsBody=await sectionsRes.json();
+    const sections=sectionsBody?.parse?.sections||[];
+
+    const storySection=sections
+      .map(sec=>({sec,score:wikiSectionScore(sec.line||'')}))
+      .filter(x=>x.score>0)
+      .sort((a,b)=>b.score-a.score)[0]?.sec;
+
+    if(!storySection) continue;
+
+    const plotUrl='https://en.wikipedia.org/w/api.php?origin=*&format=json&action=parse'
+      +'&pageid='+encodeURIComponent(pageid)
+      +'&section='+encodeURIComponent(storySection.index)
+      +'&prop=text';
+    const plotRes=await fetch(plotUrl,{cache:'force-cache'});
+    if(!plotRes.ok) continue;
+    const plotBody=await plotRes.json();
+    const html=plotBody?.parse?.text?.['*']||'';
+    const plot=storyExcerpt(stripWikiHtml(html));
+
+    if(plot.length>=140) return plot;
+  }
+
+  return '';
 }
 
 async function hydrateSynopsis(rowEl){
   const syn=rowEl.querySelector('.syn[data-imdb]');
   if(!syn || syn.dataset.loading==='1' || syn.dataset.hydrated==='1') return;
-  const imdb=syn.dataset.imdb||'';
+
   const title=syn.dataset.title||'';
   const year=syn.dataset.year||'';
+  const director=syn.dataset.director||'';
   const kind=syn.dataset.kind||'movie';
-  syn.dataset.loading='1';
-
   let current=syn.textContent.trim();
-  let best=current;
 
+  renderSynopsisContent(syn,current);
+
+  // A hand-curated multi-sentence plot already has the desired level of detail.
+  if(sentenceParts(current).length>=2 && current.length>=190){
+    syn.dataset.hydrated='1';
+    return;
+  }
+
+  syn.dataset.loading='1';
   try{
-    if(imdb){
-      const type=kind==='tv'?'series':'movie';
-      const res=await fetch('https://v3-cinemeta.strem.io/meta/'+type+'/'+encodeURIComponent(imdb)+'.json',{cache:'force-cache'});
-      if(res.ok){
-        const body=await res.json();
-        const candidate=usefulDetailedText(body?.meta?.description||'',best);
-        if(candidate) best=candidate;
-      }
+    // Only use an actual Plot/Synopsis/Premise/Story section.
+    // Never use a Wikipedia article introduction, production history or title definition.
+    const plot=await fetchWikipediaPlot(title,year,director,kind);
+    if(plot && plot.length>current.length+45){
+      current=plot;
+      renderSynopsisContent(syn,current);
     }
-
-    const wiki=await fetchWikipediaSynopsis(title,year,kind);
-    const wikiCandidate=usefulDetailedText(wiki,best);
-    if(wikiCandidate) best=wikiCandidate;
-
-    if(best!==current) syn.textContent=best;
     syn.dataset.hydrated='1';
   }catch(_err){
-    // Keep the local synopsis if online enrichment is unavailable.
+    // Keep the local movie synopsis if no verified story section is available.
   }finally{
     delete syn.dataset.loading;
   }
@@ -496,8 +593,8 @@ function row(x){
           ${microKeywords(x).length?`<div class="hook">${microKeywords(x).map(w=>`<span>${esc(w)}</span>`).join('')}</div>`:''}
 
           <div class="synopsis-block">
-            <div class="section-label">Synopsis</div>
-            <p class="syn" data-imdb="${esc(x.imdb)}" data-title="${esc(x.title)}" data-year="${esc(x.year||'')}" data-kind="${esc(x.kind)}">${esc(localDetailSynopsis(x))}</p>
+            <div class="section-label">Synopsis détaillé</div>
+            <p class="syn" data-imdb="${esc(x.imdb)}" data-title="${esc(x.title)}" data-year="${esc(x.year||'')}" data-director="${esc(x.director||'')}" data-kind="${esc(x.kind)}">${esc(localDetailSynopsis(x))}</p>
           </div>
 
           <div class="detail-facts">
