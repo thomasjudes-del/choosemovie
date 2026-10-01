@@ -290,72 +290,81 @@ function storyExcerpt(text,maxSentences=4,maxChars=680){
   return out.join(' ').trim();
 }
 
-function synopsisHighlightRanges(text=''){
+function synopsisHighlightRanges(text='',keywords=[]){
   const t=(text||'').trim();
   if(!t) return [];
 
   const candidates=[];
   const add=(start,end,score)=>{
     if(start<0 || end<=start) return;
-    const value=t.slice(start,end).trim();
-    if(value.length<4 || value.length>42) return;
+    const value=t.slice(start,end);
+    if(value.length<3 || value.length>48) return;
     candidates.push({start,end,score,value});
   };
 
-  // Character/place names are usually the quickest anchors when scanning a plot.
-  const properPhrase=/(?:\b[A-Z][A-Za-zÀ-ÿ'’-]{2,}(?:\s+(?:[A-Z][A-Za-zÀ-ÿ'’-]{2,}|of|the|de|del|la|le)){1,3}\b)/g;
-  for(const m of t.matchAll(properPhrase)) add(m.index,m.index+m[0].length,100);
-
-  const properSingle=/\b[A-Z][A-Za-zÀ-ÿ'’-]{3,}\b/g;
-  for(const m of t.matchAll(properSingle)){
-    const before=t.slice(0,m.index).trimEnd();
-    if(!before || /[.!?]["')\]]?$/.test(before)) continue;
-    add(m.index,m.index+m[0].length,92);
+  // Named story entities: people, places and named objects.
+  // At least two capitalised tokens are required so a sentence-opening word is never highlighted alone.
+  const entityRx=/\b(?:[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’-]{1,}|[IVXLCM]{2,})(?:\s+(?:of|the|de|del|la|le|du|des|and|[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’-]{1,}|[IVXLCM]{2,})){1,3}\b/g;
+  for(const m of t.matchAll(entityRx)){
+    const val=m[0].trim();
+    if(/^(The|A|An)\s/i.test(val) && val.split(/\s+/).length<3) continue;
+    add(m.index,m.index+m[0].length,100);
   }
 
-  // Reuse ChooseMovie's thematic vocabulary, but bold the actual words found in the synopsis.
-  for(const [,re] of TOPICS){
-    const flags=re.flags.includes('i')?'gi':'g';
-    const rx=new RegExp(re.source,flags);
+  // Story concepts useful for scanning. Every expression is token-bounded.
+  const storyTerms=[
+    /\bWorld War (?:I|II)\b/gi,
+    /\bCold War\b/gi,
+    /\bCivil War\b/gi,
+    /\btime travel\b/gi,
+    /\bserial killer\b/gi,
+    /\bspace station\b/gi,
+    /\bartificial intelligence\b/gi,
+    /\bprison camp\b/gi,
+    /\bconcentration camp\b/gi,
+    /\borganized crime\b/gi,
+    /\bdrug cartel\b/gi,
+    /\bNazi(?:s)?\b/gi,
+    /\baliens?\b/gi,
+    /\brobots?\b/gi,
+    /\bandroids?\b/gi,
+    /\bzombies?\b/gi,
+    /\bprison\b/gi,
+    /\bheist\b/gi,
+    /\bkidnapp(?:ing|ed)?\b/gi,
+    /\bmurder\b/gi,
+    /\brevenge\b/gi,
+    /\bsurvival\b/gi
+  ];
+  for(const rx of storyTerms){
     const m=rx.exec(t);
-    if(m) add(m.index,m.index+m[0].length,82);
+    if(m) add(m.index,m.index+m[0].length,88);
   }
 
-  // Fallback for plots with few named entities: keep a few distinctive story words.
-  const stop=new Set([
-    'about','after','again','against','almost','along','another','around','because','before','being','between',
-    'could','during','every','first','former','from','having','himself','herself','into','itself','later',
-    'learns','makes','other','their','there','these','those','through','together','under','until','where',
-    'which','while','whose','would','years','young','takes','finds','tries','becomes','begins','returns',
-    'journey','story','world','people','things','finally','however','still'
-  ]);
-  const wordRx=/\b[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]{6,}\b/g;
-  for(const m of t.matchAll(wordRx)){
-    const w=m[0].toLowerCase();
-    if(stop.has(w)) continue;
-    add(m.index,m.index+m[0].length,30+Math.min(m[0].length,12));
+  // Movie-specific keywords, but only when the exact whole phrase occurs in the synopsis.
+  for(const raw of (keywords||[])){
+    const kw=(raw||'').trim();
+    if(kw.length<3) continue;
+    const escaped=kw.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+    const rx=new RegExp('(?:^|\\b)('+escaped+')(?:\\b|$)','i');
+    const m=rx.exec(t);
+    if(m){
+      const offset=m[0].length-m[1].length;
+      add(m.index+offset,m.index+offset+m[1].length,82);
+    }
   }
 
   candidates.sort((a,b)=>b.score-a.score || a.start-b.start);
 
   const picked=[];
   for(const cand of candidates){
-    if(picked.length>=5) break;
-    if(picked.some(p=>cand.start<p.end+2 && cand.end>p.start-2)) continue;
-    if(picked.some(p=>Math.abs(cand.start-p.start)<26)) continue;
+    if(picked.length>=4) break;
+    if(picked.some(p=>cand.start<p.end && cand.end>p.start)) continue;
+    if(picked.some(p=>Math.abs(cand.start-p.start)<24)) continue;
     picked.push(cand);
   }
 
-  // Prefer a few scattered anchors over a dense block at the beginning.
-  picked.sort((a,b)=>a.start-b.start);
-  if(picked.length>4){
-    const spread=[picked[0]];
-    for(let i=1;i<picked.length && spread.length<4;i++){
-      if(picked[i].start-spread[spread.length-1].start>=38) spread.push(picked[i]);
-    }
-    if(spread.length>=3) return spread;
-  }
-  return picked.slice(0,4);
+  return picked.sort((a,b)=>a.start-b.start);
 }
 
 function renderSynopsisContent(el,text){
@@ -363,7 +372,7 @@ function renderSynopsisContent(el,text){
   el.replaceChildren();
   if(!t) return;
 
-  const ranges=synopsisHighlightRanges(t);
+  const ranges=synopsisHighlightRanges(t,(el.dataset.keywords||'').split('|').filter(Boolean));
   if(!ranges.length){
     el.textContent=t;
     return;
@@ -383,7 +392,7 @@ function renderSynopsisContent(el,text){
 
 function stripWikiHtml(html=''){
   const doc=new DOMParser().parseFromString(html,'text/html');
-  doc.querySelectorAll('sup,table,style,script,.mw-editsection,.navbox,.infobox').forEach(n=>n.remove());
+  doc.querySelectorAll('sup,table,style,script,h1,h2,h3,h4,h5,h6,.mw-editsection,.navbox,.infobox').forEach(n=>n.remove());
   return (doc.body.textContent||'')
     .replace(/\[[^\]]{1,24}\]/g,' ')
     .replace(/\s+/g,' ')
@@ -671,7 +680,7 @@ function row(x){
 
           <div class="synopsis-block">
             <div class="section-label">Synopsis détaillé</div>
-            <p class="syn" data-imdb="${esc(x.imdb)}" data-title="${esc(x.title)}" data-year="${esc(x.year||'')}" data-director="${esc(x.director||'')}" data-kind="${esc(x.kind)}">${esc(localDetailSynopsis(x))}</p>
+            <p class="syn" data-imdb="${esc(x.imdb)}" data-title="${esc(x.title)}" data-year="${esc(x.year||'')}" data-director="${esc(x.director||'')}" data-kind="${esc(x.kind)}" data-keywords="${esc(microKeywords(x).join('|'))}">${esc(localDetailSynopsis(x))}</p>
           </div>
 
           <div class="detail-facts">
