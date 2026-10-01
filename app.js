@@ -304,10 +304,13 @@ function synopsisHighlightRanges(text='',keywords=[]){
 
   // Named story entities: people, places and named objects.
   // At least two capitalised tokens are required so a sentence-opening word is never highlighted alone.
-  const entityRx=/\b(?:[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’-]{1,}|[IVXLCM]{2,})(?:\s+(?:of|the|de|del|la|le|du|des|and|[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’-]{1,}|[IVXLCM]{2,})){1,3}\b/g;
+  const properToken="(?:[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’-]{1,}|[IVXLCM]{2,})";
+  const connector="(?:of|the|de|del|la|le|du|des)";
+  const entityRx=new RegExp('\\b'+properToken+'(?:\\s+'+properToken+'|\\s+'+connector+'\\s+'+properToken+'){1,3}\\b','g');
+  const badEntityStart=/^(?:The|A|An|After|Before|During|When|While|As|In|On|At|Towards|Toward|He|She|His|Her|They|This|That|What|Plot)\b/i;
   for(const m of t.matchAll(entityRx)){
     const val=m[0].trim();
-    if(/^(The|A|An)\s/i.test(val) && val.split(/\s+/).length<3) continue;
+    if(badEntityStart.test(val)) continue;
     add(m.index,m.index+m[0].length,100);
   }
 
