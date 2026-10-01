@@ -290,18 +290,95 @@ function storyExcerpt(text,maxSentences=4,maxChars=680){
   return out.join(' ').trim();
 }
 
-function renderSynopsisContent(el,text){
-  const parts=sentenceParts(text);
-  el.replaceChildren();
-  if(parts.length>1){
-    const lead=document.createElement('strong');
-    lead.className='syn-lead';
-    lead.textContent=parts[0];
-    el.appendChild(lead);
-    el.appendChild(document.createTextNode(' '+parts.slice(1).join(' ')));
-  }else{
-    el.textContent=(text||'').trim();
+function synopsisHighlightRanges(text=''){
+  const t=(text||'').trim();
+  if(!t) return [];
+
+  const candidates=[];
+  const add=(start,end,score)=>{
+    if(start<0 || end<=start) return;
+    const value=t.slice(start,end).trim();
+    if(value.length<4 || value.length>42) return;
+    candidates.push({start,end,score,value});
+  };
+
+  // Character/place names are usually the quickest anchors when scanning a plot.
+  const properPhrase=/(?:\b[A-Z][A-Za-zÀ-ÿ'’-]{2,}(?:\s+(?:[A-Z][A-Za-zÀ-ÿ'’-]{2,}|of|the|de|del|la|le)){1,3}\b)/g;
+  for(const m of t.matchAll(properPhrase)) add(m.index,m.index+m[0].length,100);
+
+  const properSingle=/\b[A-Z][A-Za-zÀ-ÿ'’-]{3,}\b/g;
+  for(const m of t.matchAll(properSingle)){
+    const before=t.slice(0,m.index).trimEnd();
+    if(!before || /[.!?]["')\]]?$/.test(before)) continue;
+    add(m.index,m.index+m[0].length,92);
   }
+
+  // Reuse ChooseMovie's thematic vocabulary, but bold the actual words found in the synopsis.
+  for(const [,re] of TOPICS){
+    const flags=re.flags.includes('i')?'gi':'g';
+    const rx=new RegExp(re.source,flags);
+    const m=rx.exec(t);
+    if(m) add(m.index,m.index+m[0].length,82);
+  }
+
+  // Fallback for plots with few named entities: keep a few distinctive story words.
+  const stop=new Set([
+    'about','after','again','against','almost','along','another','around','because','before','being','between',
+    'could','during','every','first','former','from','having','himself','herself','into','itself','later',
+    'learns','makes','other','their','there','these','those','through','together','under','until','where',
+    'which','while','whose','would','years','young','takes','finds','tries','becomes','begins','returns',
+    'journey','story','world','people','things','finally','however','still'
+  ]);
+  const wordRx=/\b[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]{6,}\b/g;
+  for(const m of t.matchAll(wordRx)){
+    const w=m[0].toLowerCase();
+    if(stop.has(w)) continue;
+    add(m.index,m.index+m[0].length,30+Math.min(m[0].length,12));
+  }
+
+  candidates.sort((a,b)=>b.score-a.score || a.start-b.start);
+
+  const picked=[];
+  for(const cand of candidates){
+    if(picked.length>=5) break;
+    if(picked.some(p=>cand.start<p.end+2 && cand.end>p.start-2)) continue;
+    if(picked.some(p=>Math.abs(cand.start-p.start)<26)) continue;
+    picked.push(cand);
+  }
+
+  // Prefer a few scattered anchors over a dense block at the beginning.
+  picked.sort((a,b)=>a.start-b.start);
+  if(picked.length>4){
+    const spread=[picked[0]];
+    for(let i=1;i<picked.length && spread.length<4;i++){
+      if(picked[i].start-spread[spread.length-1].start>=38) spread.push(picked[i]);
+    }
+    if(spread.length>=3) return spread;
+  }
+  return picked.slice(0,4);
+}
+
+function renderSynopsisContent(el,text){
+  const t=(text||'').trim();
+  el.replaceChildren();
+  if(!t) return;
+
+  const ranges=synopsisHighlightRanges(t);
+  if(!ranges.length){
+    el.textContent=t;
+    return;
+  }
+
+  let cursor=0;
+  for(const range of ranges){
+    if(range.start>cursor) el.appendChild(document.createTextNode(t.slice(cursor,range.start)));
+    const strong=document.createElement('strong');
+    strong.className='syn-key';
+    strong.textContent=t.slice(range.start,range.end);
+    el.appendChild(strong);
+    cursor=range.end;
+  }
+  if(cursor<t.length) el.appendChild(document.createTextNode(t.slice(cursor)));
 }
 
 function stripWikiHtml(html=''){
